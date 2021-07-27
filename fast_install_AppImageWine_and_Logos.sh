@@ -1,12 +1,12 @@
 #!/bin/bash
 # From https://github.com/ferion11/LogosLinuxInstaller
-export THIS_SCRIPT_VERSION="fast-v2.22"
+export THIS_SCRIPT_VERSION="fast-v2.32"
 export LOGOS_SCRIPT_TITLE="fast_install_AppImageWine_and_Logos"
 export LOGOS_SCRIPT_AUTHOR="Ferion11"
 
 #=================================================
 # version of Logos from: https://wiki.logos.com/The_Logos_9_Beta_Program
-if [ -z "${LOGOS64_URL}" ]; then export LOGOS64_URL="https://downloads.logoscdn.com/LBS9/Installer/9.2.0.0014/Logos-x64.msi" ; fi
+if [ -z "${LOGOS64_URL}" ]; then export LOGOS64_URL="https://downloads.logoscdn.com/LBS9/Installer/9.6.0.0024/Logos-x64.msi" ; fi
 
 #LOGOS_MVERSION=$(echo "${LOGOS64_URL}" | cut -d/ -f4); export LOGOS_MVERSION
 LOGOS_VERSION="$(echo "${LOGOS64_URL}" | cut -d/ -f6)"; export LOGOS_VERSION
@@ -14,9 +14,14 @@ LOGOS64_MSI="$(basename "${LOGOS64_URL}")"; export LOGOS64_MSI
 #=================================================
 if [ -z "${LOGOS_ICON_URL}" ]; then export LOGOS_ICON_URL="https://raw.githubusercontent.com/ferion11/LogosLinuxInstaller/master/img/logos4-128-icon.png" ; fi
 #=================================================
+# Default AppImage FULL (with deps) to install 64bits version:
+export WINE64_APPIMAGE_FULL_VERSION="v6.5"
+if [ -z "${WINE64_APPIMAGE_FULL_URL}" ]; then export WINE64_APPIMAGE_FULL_URL="https://github.com/ferion11/wine_WoW64_fulldeps_AppImage/releases/download/test-beta3/wine-staging-linux-amd64-fulldeps-v6.5-f11-x86_64.AppImage" ; fi
+WINE64_APPIMAGE_FULL_FILENAME="$(basename "${WINE64_APPIMAGE_FULL_URL}")"; export WINE64_APPIMAGE_FULL_FILENAME
+#=================================================
 # Default AppImage (without deps) to install 64bits version:
-export WINE64_APPIMAGE_VERSION="v5.11"
-if [ -z "${WINE64_APPIMAGE_URL}" ]; then export WINE64_APPIMAGE_URL="https://github.com/ferion11/wine_WoW64_nodeps_AppImage/releases/download/continuous-logosB/wine-staging-linux-amd64-nodeps-v5.11-f11-x86_64.AppImage" ; fi
+export WINE64_APPIMAGE_VERSION="v6.5"
+if [ -z "${WINE64_APPIMAGE_URL}" ]; then export WINE64_APPIMAGE_URL="https://github.com/ferion11/wine_WoW64_nodeps_AppImage/releases/download/continuous-logos/wine-staging-linux-amd64-nodeps-v6.5-f11-x86_64.AppImage" ; fi
 WINE64_APPIMAGE_FILENAME="$(basename "${WINE64_APPIMAGE_URL}")"; export WINE64_APPIMAGE_FILENAME
 #=================================================
 if [ -z "${WORKDIR}" ]; then WORKDIR="$(mktemp -d)"; export WORKDIR ; fi
@@ -607,21 +612,12 @@ installationChoice="$(zenity --width=700 --height=310 \
 	--title="Question: Install Logos Bible using script ${THIS_SCRIPT_VERSION}" \
 	--text="This script will create one directory in (which can be changed by setting the INSTALLDIR variable):\n\"${INSTALLDIR}\"\nto be an installation of LogosBible v${LOGOS_VERSION} independent of other installations.\nPlease select the type of installation:" \
 	--list --radiolist --column "S" --column "Description" \
-	TRUE "1- Fast install LogosBible64 using Wine64 ${WINE64_APPIMAGE_VERSION} plain AppImage without dependencies (default)." \
-	FALSE "2- Fast install LogosBible64 using the native Wine64." )"
+	TRUE "1- Fast install LogosBible64 using the native Wine64 (default)." \
+	FALSE "2- Fast install LogosBible64 using Wine64 ${WINE64_APPIMAGE_FULL_VERSION} AppImage." )"
+# FALSE "3- Fast install LogosBible64 using Wine64 ${WINE64_APPIMAGE_VERSION} plain AppImage without dependencies."
 
 case "${installationChoice}" in
 	1*)
-		echo "Installing LogosBible 64bits using ${WINE64_APPIMAGE_VERSION} plain AppImage without dependencies..."
-		export WINEARCH=win64
-		export WINEPREFIX="${APPDIR}/wine64_bottle"
-		export WINE_EXE="wine64"
-
-		make_skel "64" "${WINE_EXE}" "${WINE64_APPIMAGE_FILENAME}"
-		export SET_APPIMAGE_FILENAME="${WINE64_APPIMAGE_FILENAME}"
-		export SET_APPIMAGE_URL="${WINE64_APPIMAGE_URL}"
-		;;
-	2*)
 		echo "Installing LogosBible 64bits using the native Wine..."
 		export NO_APPIMAGE="1"
 		export WINEARCH=win64
@@ -634,6 +630,26 @@ case "${installationChoice}" in
 		echo "Using: ${WINE_VERSION_CHECK}"
 
 		make_skel "64" "${WINE_EXE}" "none.AppImage"
+		;;
+	2*)
+		echo "Installing LogosBible 64bits using ${WINE64_APPIMAGE_FULL_VERSION} AppImage..."
+		export WINEARCH=win64
+		export WINEPREFIX="${APPDIR}/wine64_bottle"
+		export WINE_EXE="wine64"
+
+		make_skel "64" "${WINE_EXE}" "${WINE64_APPIMAGE_FULL_FILENAME}"
+		export SET_APPIMAGE_FILENAME="${WINE64_APPIMAGE_FULL_FILENAME}"
+		export SET_APPIMAGE_URL="${WINE64_APPIMAGE_FULL_URL}"
+		;;
+	3*)
+		echo "Installing LogosBible 64bits using ${WINE64_APPIMAGE_VERSION} plain AppImage without dependencies..."
+		export WINEARCH=win64
+		export WINEPREFIX="${APPDIR}/wine64_bottle"
+		export WINE_EXE="wine64"
+
+		make_skel "64" "${WINE_EXE}" "${WINE64_APPIMAGE_FILENAME}"
+		export SET_APPIMAGE_FILENAME="${WINE64_APPIMAGE_FILENAME}"
+		export SET_APPIMAGE_URL="${WINE64_APPIMAGE_URL}"
 		;;
 	*)
 		gtk_fatal_error "Installation canceled!"
@@ -720,6 +736,10 @@ else
 fi
 echo "${WINE_EXE} msiexec /i ${LOGOS64_MSI}"
 ${WINE_EXE} msiexec /i "${WORKDIR}"/"${LOGOS64_MSI}"
+
+echo "======= Set LogosBible Indexing to Vista Mode: ======="
+${WINE_EXE} reg add "HKCU\\Software\\Wine\\AppDefaults\\LogosIndexer.exe" /v Version /t REG_SZ /d vista /f
+echo "======= LogosBible logging set to Vista mode! ======="
 
 heavy_wineserver_wait
 echo "================================================="

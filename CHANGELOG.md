@@ -94,3 +94,29 @@
   - update to LogosBible 9.1.0.0018
 * from v2.21 to v2.22:
   - update to LogosBible 9.2.0.0014
+* from v2.22 to v2.23:
+  - Typos, spelling, grammar by T. H. Wright (thw26)
+  - update to LogosBible 9.3.0.0040
+* from v2.23 to v2.24:
+  - update to LogosBible 9.3.0.0049 by John Goodman (jg00dman)
+  - added change to vista on winebottle by John Goodman (jg00dman)
+* from v2.24 to v2.25:
+  - update to LogosBible 9.4.0.0009
+* from v2.25 to v2.26:
+  - update to WINE AppImage v6.5
+  - added AppImage with deps and new default option
+* from v2.26 to v2.27:
+  - update to WINE default AppImage
+* from v2.27 to v2.28:
+  - default option to be the WINE native
+  - removed nodeps AppImage option
+  - update to LogosBible 9.5.0.0014
+* from v2.28 to v2.29:
+  - update to LogosBible 9.5.0.0019
+* from v2.29 to v2.30:
+  - update to LogosBible 9.6.0.0020
+* from v2.30 to v2.31:
+  - update to LogosBible 9.6.0.0023
+* from v2.31 to v2.32:
+  - update to LogosBible 9.6.0.0024
+
