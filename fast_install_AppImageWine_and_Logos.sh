@@ -1,6 +1,8 @@
 #!/bin/bash
 # From https://github.com/ferion11/LogosLinuxInstaller
 export THIS_SCRIPT_VERSION="fast-v2.22"
+export LOGOS_SCRIPT_TITLE="fast_install_AppImageWine_and_Logos"
+export LOGOS_SCRIPT_AUTHOR="Ferion11"
 
 #=================================================
 # version of Logos from: https://wiki.logos.com/The_Logos_9_Beta_Program
@@ -30,6 +32,45 @@ export EXTRA_INFO="Usually is necessary: winbind cabextract libjpeg8."
 #=================================================
 
 #======= Aux =============
+usage() {
+cat << EOF
+LogosLinuxInstaller $LOGOS_SCRIPT_TITLE $THIS_SCRIPT_VERSION.
+
+Usage: ./install_AppImageWine_and_Logos.sh
+Installs Logos Bible Software with Wine in an AppImage on Linux.
+
+Options:
+    -h   --help         Prints this help message and exit.
+    -V   --version      Prints version information and exit.
+    -v   --verbose      Makes the script output to the terminal. [WIP]
+EOF
+}
+
+RESET_OPTARGS=true
+for arg in "$@"
+do
+    if [ -n "$RESET_OPTARGS" ]; then
+      unset RESET_OPTARGS
+      set -- 
+    fi  
+    case "$arg" in
+        --help)    set -- "$@" -h ;;
+        --version) set -- "$@" -V ;;
+        --verbose) set -- "$@" -v ;;
+        *)         set -- "$@" "$arg" ;;
+    esac
+done
+while getopts ":hVv" opt; do
+    case $opt in
+        h)  usage && exit ;;
+        V)  echo "$LOGOS_SCRIPT_TITLE, $THIS_SCRIPT_VERSION by $LOGOS_SCRIPT_AUTHOR." && exit;;
+        v)  VERBOSE=true ;;
+        \?) echo "$LOGOS_SCRIPT_TITLE: -$OPTARG: undefined option." >&2 && usage >&2 && exit ;;
+        :)  echo "$LOGOS_SCRIPT_TITLE: -$OPTARG: missing argument." >&2 && usage >&2 && exit ;;
+    esac
+done
+shift $((OPTIND-1))
+
 die() { echo >&2 "$*"; exit 1; };
 
 have_dep() {
