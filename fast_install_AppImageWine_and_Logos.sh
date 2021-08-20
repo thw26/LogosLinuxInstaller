@@ -562,16 +562,18 @@ make_skel() {
 echo "================================================="
 echo 'Searching for dependencies:'
 
+if [ `id -u` -eq 0 ]; then
+        echo "The Logos Installer should not be run as root." && exit 1;
+fi
+
 if [ -z "${DISPLAY}" ]; then
-	echo "* You want to run without X, but it doesn't work."
-	exit 1
+	echo "* You want to run without X, but it doesn't work." && exit 1;
 fi
 
 if have_dep zenity; then
 	echo '* Zenity is installed!'
 else
-	echo '* Your system does not have Zenity. Please install Zenity package.'
-	exit 1
+	echo '* Your system does not have Zenity. Please install Zenity package.' && exit 1;
 fi
 
 check_commands mktemp patch lsof wget xwd find sed grep cabextract ntlm_auth
