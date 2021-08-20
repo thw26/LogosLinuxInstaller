@@ -575,8 +575,8 @@ make_skel() {
 echo "================================================="
 echo 'Searching for dependencies:'
 
-if [ `id -u` -eq 0 ]; then
-        echo "The Logos Installer should not be run as root." && exit 1;
+if [ `id -u` -eq 0 ] && [ "$FORCE_ROOT" != "1" ]; then
+        echo "The Logos Installer should not be run as root. Set FORCE_ROOT=1 if desired." && exit 1;
 fi
 
 if [ -z "${DISPLAY}" ]; then
