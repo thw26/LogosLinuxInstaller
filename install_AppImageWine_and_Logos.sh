@@ -1,8 +1,8 @@
 #!/bin/bash
 # From https://github.com/ferion11/LogosLinuxInstaller
+export THIS_SCRIPT_VERSION="fast-v2.33-rc1"
 export LOGOS_SCRIPT_TITLE="install_AppImageWine_and_Logos"
 export LOGOS_SCRIPT_AUTHOR="Ferion11"
-export THIS_SCRIPT_VERSION="v2.33-rc1"
 
 #=================================================
 # version of Logos from: https://wiki.logos.com/The_Logos_9_Beta_Program

@@ -34,6 +34,7 @@ if [ -z "${FORCE_ROOT+x}" ]; then export FORCE_ROOT="" ; fi
 if [ -z "${WINEBOOT_GUI+x}" ]; then export WINEBOOT_GUI="" ; fi
 export EXTRA_INFO="Usually is necessary: winbind cabextract libjpeg8."
 #=================================================
+VERBOSE=false
 #=================================================
 
 #======= Aux =============
@@ -46,8 +47,8 @@ Installs Logos Bible Software with Wine in an AppImage on Linux.
 
 Options:
     -h   --help         Prints this help message and exit.
-    -V   --version      Prints version information and exit.
-    -v   --verbose      Makes the script output to the terminal. [WIP]
+    -v   --version      Prints version information and exit.
+    -q   --quiet      Makes the script output to the terminal. [WIP]
 EOF
 }
 
@@ -61,15 +62,15 @@ do
     case "$arg" in
         --help)    set -- "$@" -h ;;
         --version) set -- "$@" -V ;;
-        --verbose) set -- "$@" -v ;;
+        --quiet) set -- "$@" -q ;;
         *)         set -- "$@" "$arg" ;;
     esac
 done
-while getopts ":hVv" opt; do
+while getopts ":hvq" opt; do
     case $opt in
         h)  usage && exit ;;
-        V)  echo "$LOGOS_SCRIPT_TITLE, $THIS_SCRIPT_VERSION by $LOGOS_SCRIPT_AUTHOR." && exit;;
-        v)  VERBOSE=true ;;
+        v)  echo "$LOGOS_SCRIPT_TITLE, $THIS_SCRIPT_VERSION by $LOGOS_SCRIPT_AUTHOR." && exit;;
+        q)  VERBOSE=true ;;
         \?) echo "$LOGOS_SCRIPT_TITLE: -$OPTARG: undefined option." >&2 && usage >&2 && exit ;;
         :)  echo "$LOGOS_SCRIPT_TITLE: -$OPTARG: missing argument." >&2 && usage >&2 && exit ;;
     esac
@@ -77,6 +78,10 @@ done
 shift $((OPTIND-1))
 
 die() { echo >&2 "$*"; exit 1; };
+
+verbose() {
+        [[ $VERBOSE = true ]] && return 0 || return 1
+}
 
 have_dep() {
 	command -v "$1" >/dev/null 2>&1
