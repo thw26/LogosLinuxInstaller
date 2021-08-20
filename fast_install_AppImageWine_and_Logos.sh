@@ -1,8 +1,8 @@
 #!/bin/bash
 # From https://github.com/ferion11/LogosLinuxInstaller
-export THIS_SCRIPT_VERSION="fast-v2.32"
 export LOGOS_SCRIPT_TITLE="fast_install_AppImageWine_and_Logos"
 export LOGOS_SCRIPT_AUTHOR="Ferion11"
+export THIS_SCRIPT_VERSION="fast-v2.33-rc1"
 
 #=================================================
 # version of Logos from: https://wiki.logos.com/The_Logos_9_Beta_Program
@@ -695,7 +695,8 @@ heavy_wineserver_wait() {
 
 echo "================================================="
 # get and install pre-made wineBottle
-WINE64_BOTTLE_TARGZ_URL="https://github.com/ferion11/wine64_bottle_dotnet/releases/download/v5.11/wine64_bottle.tar.gz"
+#WINE64_BOTTLE_TARGZ_URL="https://github.com/ferion11/wine64_bottle_dotnet/releases/download/v5.11/wine64_bottle.tar.gz"
+WINE64_BOTTLE_TARGZ_URL="https://github.com/ferion11/wine64_bottle_dotnet/releases/download/v5.11b/wine64_bottle.tar.gz"
 WINE64_BOTTLE_TARGZ_NAME="wine64_bottle.tar.gz"
 echo "Installing pre-made wineBottle 64bits..."
 if [ -f "${DOWNLOADED_RESOURCES}/${WINE64_BOTTLE_TARGZ_NAME}" ]; then

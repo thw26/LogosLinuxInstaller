@@ -1,8 +1,8 @@
 #!/bin/bash
 # From https://github.com/ferion11/LogosLinuxInstaller
-export THIS_SCRIPT_VERSION="v2.32"
 export LOGOS_SCRIPT_TITLE="install_AppImageWine_and_Logos"
 export LOGOS_SCRIPT_AUTHOR="Ferion11"
+export THIS_SCRIPT_VERSION="v2.33-rc1"
 
 #=================================================
 # version of Logos from: https://wiki.logos.com/The_Logos_9_Beta_Program
@@ -802,6 +802,8 @@ if [ -z "${WINETRICKS_UNATTENDED}" ]; then
 	echo "================================================="
 	winetricks_install corefonts
 	echo "================================================="
+	winetricks_install tahoma
+	echo "================================================="
 	winetricks_install settings fontsmooth=rgb
 	echo "================================================="
 	winetricks_install dotnet48
@@ -809,6 +811,8 @@ if [ -z "${WINETRICKS_UNATTENDED}" ]; then
 else
 	echo "================================================="
 	winetricks_install -q corefonts
+	echo "================================================="
+	winetricks_install -q tahoma
 	echo "================================================="
 	winetricks_install -q settings fontsmooth=rgb
 	echo "================================================="
