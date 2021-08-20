@@ -1,6 +1,6 @@
 #!/bin/bash
 # From https://github.com/ferion11/LogosLinuxInstaller
-export THIS_SCRIPT_VERSION="fast-v2.33-rc1"
+export THIS_SCRIPT_VERSION="v2.33-rc1"
 export LOGOS_SCRIPT_TITLE="install_AppImageWine_and_Logos"
 export LOGOS_SCRIPT_AUTHOR="Ferion11"
 
@@ -45,6 +45,10 @@ export EXTRA_INFO="Usually is necessary: winbind cabextract libjpeg8."
 #=================================================
 VERBOSE=true
 #=================================================
+
+if [ `id -u` -eq 0 ]; then
+	echo "Error: The Logos Installer should not be run as root." >$2 && exit ;
+fi
 
 #======= Aux =============
 usage() {
@@ -576,16 +580,18 @@ make_skel() {
 echo "================================================="
 echo 'Searching for dependencies:'
 
+if [ `id -u` -eq 0 ] && [ -z "${FORCE_ROOT}" ]; then
+        echo "The Logos Installer should not be run as root. Set FORCE_ROOT=1 if desired." && exit 1;
+fi
+
 if [ -z "${DISPLAY}" ]; then
-	echo "* You want to run without X, but it doesn't work."
-	exit 1
+	echo "* You want to run without X, but it doesn't work." && exit 1
 fi
 
 if have_dep zenity; then
 	echo '* Zenity is installed!'
 else
-	echo '* Your system does not have Zenity. Please install Zenity package.'
-	exit 1
+	echo '* Your system does not have Zenity. Please install Zenity package.' && exit 1
 fi
 
 check_commands mktemp patch lsof wget xwd find sed grep cabextract ntlm_auth
