@@ -115,13 +115,13 @@ clean_all() {
 
 #zenity------
 gtk_info() {
-	zenity --info --width=300 --height=200 --text="$*" --title='Information'
+	[[ no_zenity -eq 1 ]] && zenity --info --width=300 --height=200 --text="$*" --title='Information'
 }
 gtk_warn() {
-	zenity --warning --width=300 --height=200 --text="$*" --title='Warning!'
+	[[ no_zenity -eq 1 ]] && zenity --warning --width=300 --height=200 --text="$*" --title='Warning!'
 }
 gtk_error() {
-	zenity --error --width=300 --height=200 --text="$*" --title='Error!'
+	[[ no_zenity -eq 1 ]] && zenity --error --width=300 --height=200 --text="$*" --title='Error!'
 }
 gtk_fatal_error() {
 	gtk_error "$@"
@@ -131,7 +131,7 @@ gtk_fatal_error() {
 }
 
 mkdir_critical() {
-	mkdir "$1" || [[ no_zenity -eq 1 ]] && gtk_fatal_error "Can't create the $1 directory"
+	mkdir "$1" || gtk_fatal_error "Can't create the $1 directory"
 }
 
 gtk_question() {
@@ -141,7 +141,7 @@ gtk_question() {
 	fi
 }
 gtk_continue_question() {
-	if ! gtk_question "$@"; then [[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled!"; fi
+	if ! gtk_question "$@"; then gtk_fatal_error "The installation was cancelled!"; fi
 }
 
 # shellcheck disable=SC2028
@@ -242,10 +242,10 @@ gtk_download() {
 	if [ "${ZENITY_RETURN}" == "0" ] || [ "${ZENITY_RETURN}" == "127" ] ; then
 		if [ "${WGET_RETURN}" != "0" ] && [ "${WGET_RETURN}" != "127" ] ; then
 			verbose && echo "ERROR: error downloading the file! WGET_RETURN: ${WGET_RETURN}"
-			[[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled because of error downloading the file!\n * ${FILENAME}\n  - WGET_RETURN: ${WGET_RETURN}"
+			gtk_fatal_error "The installation was cancelled because of error downloading the file!\n * ${FILENAME}\n  - WGET_RETURN: ${WGET_RETURN}"
 		fi
 	else
-		[[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled!\n * ZENITY_RETURN: ${ZENITY_RETURN}"
+		gtk_fatal_error "The installation was cancelled!\n * ZENITY_RETURN: ${ZENITY_RETURN}"
 	fi
 	echo "${FILENAME} download finished!"
 }
@@ -256,7 +256,7 @@ check_commands() {
 			verbose && echo "* command ${cmd} is installed!"
 		else
 			verbose && echo "* Your system does not have the command: ${cmd}. Please install command ${cmd} package. ${EXTRA_INFO}"
-			[[ no_zenity -eq 1 ]] && gtk_fatal_error "Your system does not have command: ${cmd}. Please install command ${cmd} package.\n ${EXTRA_INFO}"
+			gtk_fatal_error "Your system does not have command: ${cmd}. Please install command ${cmd} package.\n ${EXTRA_INFO}"
 		fi
 	done
 }
@@ -268,7 +268,7 @@ check_libs() {
 			verbose && echo "* ${lib} is installed!"
 		else
 			verbose && echo "* Your system does not have the lib: ${lib}. Please install ${lib} package. ${EXTRA_INFO}"
-			[[ no_zenity -eq 1 ]] && gtk_fatal_error "Your system does not have lib: ${lib}. Please install ${lib} package.\n ${EXTRA_INFO}"
+			gtk_fatal_error "Your system does not have lib: ${lib}. Please install ${lib} package.\n ${EXTRA_INFO}"
 		fi
 	done
 }
@@ -588,7 +588,7 @@ verbose && echo "================================================="
 verbose && echo 'Searching for dependencies:'
 
 if [ `id -u` -eq 0 ] && [ -z "${FORCE_ROOT}" ]; then
-	[[ no_zenity -eq 1 ]] && gtk_fatal_error "The Logos Installer should not be run as root. Set FORCE_ROOT=1 if desired. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F for more information."
+	gtk_fatal_error "The Logos Installer should not be run as root. Set FORCE_ROOT=1 if desired. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F for more information."
 	verbose && echo "The Logos Installer should not be run as root. Set FORCE_ROOT=1 if desired. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F for more information.";
 	exit  1;
 fi
@@ -630,7 +630,7 @@ esac
 #======= Main =============
 if [ -d "${INSTALLDIR}" ]; then
 	verbose && echo "A directory already exists at ${INSTALLDIR}. Please remove/rename it or use another location by setting the INSTALLDIR variable"
-	[[ no_zenity -eq 1 ]] && gtk_fatal_error "a directory already exists at ${INSTALLDIR}. Please remove/rename it or use another location by setting the INSTALLDIR variable"
+	gtk_fatal_error "a directory already exists at ${INSTALLDIR}. Please remove/rename it or use another location by setting the INSTALLDIR variable"
 fi
 
 verbose && echo "* Script version: ${THIS_SCRIPT_VERSION}"
@@ -656,7 +656,7 @@ case "${installationChoice}" in
 
 		# check for wine installation
 		WINE_VERSION_CHECK="$(${WINE_EXE} --version)"
-		[ -z "${WINE_VERSION_CHECK}" ] && [[ no_zenity -eq 1 ]] && gtk_fatal_error "Wine64 not found! Please install native Wine64 first."
+		[ -z "${WINE_VERSION_CHECK}" ] && gtk_fatal_error "Wine64 not found! Please install native Wine64 first."
 		verbose && echo "Using: ${WINE_VERSION_CHECK}"
 
 		make_skel "64" "${WINE_EXE}" "none.AppImage"
@@ -682,7 +682,7 @@ case "${installationChoice}" in
 		export SET_APPIMAGE_URL="${WINE64_APPIMAGE_URL}"
 		;;
 	*)
-		[[ no_zenity -eq 1 ]] && gtk_fatal_error "Installation canceled!"
+		gtk_fatal_error "Installation canceled!"
 esac
 
 # exporting PATH to internal use if using AppImage, doing backup too:
@@ -705,7 +705,7 @@ if [ -z "${NO_APPIMAGE}" ] ; then
 		fi
 	else
 		verbose && echo "${SET_APPIMAGE_FILENAME} does not exist. Downloading..."
-		[[ no_zenity -eq 1 ]] && gtk_download "${SET_APPIMAGE_URL}" "${WORKDIR}"
+		gtk_download "${SET_APPIMAGE_URL}" "${WORKDIR}"
 
 		if [[ no_zenity -eq 1 ]]; then
 			mv "${WORKDIR}/${SET_APPIMAGE_FILENAME}" "${APPDIR}" | zenity --progress --title="Moving..." --text="Moving: ${SET_APPIMAGE_FILENAME}\ninto: ${APPDIR}" --pulsate --auto-close --no-cancel
@@ -829,11 +829,11 @@ winetricks_install() {
 		if [ "${WINETRICKS_STATUS}" != "0" ] ; then
 			wineserver -k
 			verbose && echo "ERROR on : winetricks ${*}; WINETRICKS_STATUS: ${WINETRICKS_STATUS}"
-			[[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled because of sub-job failure!\n * winetricks ${*}\n  - WINETRICKS_STATUS: ${WINETRICKS_STATUS}"
+			gtk_fatal_error "The installation was cancelled because of sub-job failure!\n * winetricks ${*}\n  - WINETRICKS_STATUS: ${WINETRICKS_STATUS}"
 		fi
 	else
 		wineserver -k
-		[[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled!\n * ZENITY_RETURN: ${ZENITY_RETURN}"
+		gtk_fatal_error "The installation was cancelled!\n * ZENITY_RETURN: ${ZENITY_RETURN}"
 	fi
 	verbose && echo "winetricks ${*} DONE!"
 
