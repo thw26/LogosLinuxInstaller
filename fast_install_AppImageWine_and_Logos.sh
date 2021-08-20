@@ -48,8 +48,12 @@ Installs Logos Bible Software with Wine in an AppImage on Linux.
 Options:
     -h   --help         Prints this help message and exit.
     -v   --version      Prints version information and exit.
-    -q   --quiet        Makes the script quiet and non-interactive. Installs using native    wine. The installer will quietly fail. If successful, Logos will not automatically run.
+    -q   --quiet        Disables the script's CLI output. The installer will
+                        quietly fail if it hits an error. If successful, Logos
+                        will not automatically run.
     -Z   --no-zenity    Disables Zenity. Install still requires X for install.
+                        Pair with -q|--quiet for an automated and non-interactive
+                        install. Defaults to an install using native  wine.
 EOF
 }
 

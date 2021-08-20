@@ -55,10 +55,14 @@ Usage: ./install_AppImageWine_and_Logos.sh
 Installs Logos Bible Software with Wine in an AppImage on Linux.
 
 Options:
-    -h   --help		Prints this help message and exit.
-    -v   --version	Prints version information and exit.
-    -q   --quiet	Makes the script quiet and non-interactive. Installs using native wine. The installer will quietly fail. If successful, Logos will not automatically run.
+    -h   --help		Prints this help message and exits.
+    -v   --version	Prints version information and exits.
+    -q   --quiet	Disables the script's CLI output. The installer will
+                        quietly fail if it hits an error. If successful, Logos
+                        will not automatically run.
     -Z   --no-zenity    Disables Zenity. Install still requires X for install.
+                        Pair with -q|--quiet for an automated and non-interactive
+                        install. Defaults to an install using native wine.
 EOF
 }
 
@@ -127,7 +131,7 @@ gtk_fatal_error() {
 }
 
 mkdir_critical() {
-	mkdir "$1" || verbose && [[ no_zenity -eq 1 ]] && gtk_fatal_error "Can't create the $1 directory"
+	mkdir "$1" || [[ no_zenity -eq 1 ]] && gtk_fatal_error "Can't create the $1 directory"
 }
 
 gtk_question() {
@@ -137,7 +141,7 @@ gtk_question() {
 	fi
 }
 gtk_continue_question() {
-	if ! gtk_question "$@"; then verbose && [[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled!"; fi
+	if ! gtk_question "$@"; then [[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled!"; fi
 }
 
 # shellcheck disable=SC2028
@@ -178,7 +182,7 @@ gtk_download() {
 	mkfifo "${pipe_wget}"
 
 	# zenity GUI feedback
-	verbose && [[ no_zenity -eq 1 ]] && zenity --progress --title "Downloading ${FILENAME}..." --text="Downloading: ${FILENAME}\ninto: ${2}\n" --percentage=0 --auto-close < "${pipe_progress}" &
+	[[ no_zenity -eq 1 ]] && zenity --progress --title "Downloading ${FILENAME}..." --text="Downloading: ${FILENAME}\ninto: ${2}\n" --percentage=0 --auto-close < "${pipe_progress}" &
 	ZENITY_PID="${!}"
 
 	# download the file with wget:
@@ -238,10 +242,10 @@ gtk_download() {
 	if [ "${ZENITY_RETURN}" == "0" ] || [ "${ZENITY_RETURN}" == "127" ] ; then
 		if [ "${WGET_RETURN}" != "0" ] && [ "${WGET_RETURN}" != "127" ] ; then
 			verbose && echo "ERROR: error downloading the file! WGET_RETURN: ${WGET_RETURN}"
-			verbose && [[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled because of error downloading the file!\n * ${FILENAME}\n  - WGET_RETURN: ${WGET_RETURN}"
+			[[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled because of error downloading the file!\n * ${FILENAME}\n  - WGET_RETURN: ${WGET_RETURN}"
 		fi
 	else
-		verbose && [[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled!\n * ZENITY_RETURN: ${ZENITY_RETURN}"
+		[[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled!\n * ZENITY_RETURN: ${ZENITY_RETURN}"
 	fi
 	echo "${FILENAME} download finished!"
 }
@@ -252,7 +256,7 @@ check_commands() {
 			verbose && echo "* command ${cmd} is installed!"
 		else
 			verbose && echo "* Your system does not have the command: ${cmd}. Please install command ${cmd} package. ${EXTRA_INFO}"
-			verbose && [[ no_zenity -eq 1 ]] && gtk_fatal_error "Your system does not have command: ${cmd}. Please install command ${cmd} package.\n ${EXTRA_INFO}"
+			[[ no_zenity -eq 1 ]] && gtk_fatal_error "Your system does not have command: ${cmd}. Please install command ${cmd} package.\n ${EXTRA_INFO}"
 		fi
 	done
 }
@@ -264,7 +268,7 @@ check_libs() {
 			verbose && echo "* ${lib} is installed!"
 		else
 			verbose && echo "* Your system does not have the lib: ${lib}. Please install ${lib} package. ${EXTRA_INFO}"
-			verbose && [[ no_zenity -eq 1 ]] && gtk_fatal_error "Your system does not have lib: ${lib}. Please install ${lib} package.\n ${EXTRA_INFO}"
+			[[ no_zenity -eq 1 ]] && gtk_fatal_error "Your system does not have lib: ${lib}. Please install ${lib} package.\n ${EXTRA_INFO}"
 		fi
 	done
 }
@@ -584,7 +588,7 @@ verbose && echo "================================================="
 verbose && echo 'Searching for dependencies:'
 
 if [ `id -u` -eq 0 ] && [ -z "${FORCE_ROOT}" ]; then
-	verbose && [[ no_zenity -eq 1 ]] && gtk_fatal_error "The Logos Installer should not be run as root. Set FORCE_ROOT=1 if desired. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F for more information."
+	[[ no_zenity -eq 1 ]] && gtk_fatal_error "The Logos Installer should not be run as root. Set FORCE_ROOT=1 if desired. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F for more information."
 	verbose && echo "The Logos Installer should not be run as root. Set FORCE_ROOT=1 if desired. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F for more information.";
 	exit  1;
 fi
@@ -626,11 +630,11 @@ esac
 #======= Main =============
 if [ -d "${INSTALLDIR}" ]; then
 	verbose && echo "A directory already exists at ${INSTALLDIR}. Please remove/rename it or use another location by setting the INSTALLDIR variable"
-	verbose && [[ no_zenity -eq 1 ]] && gtk_fatal_error "a directory already exists at ${INSTALLDIR}. Please remove/rename it or use another location by setting the INSTALLDIR variable"
+	[[ no_zenity -eq 1 ]] && gtk_fatal_error "a directory already exists at ${INSTALLDIR}. Please remove/rename it or use another location by setting the INSTALLDIR variable"
 fi
 
 verbose && echo "* Script version: ${THIS_SCRIPT_VERSION}"
-if verbose && [[ no_zenity -eq 1 ]]; then
+if [[ no_zenity -eq 1 ]]; then
 	installationChoice="$(zenity --width=700 --height=310 \
 		--title="Question: Install Logos Bible using script ${THIS_SCRIPT_VERSION}" \
 		--text="This script will create one directory in (which can be changed by setting the INSTALLDIR variable):\n\"${INSTALLDIR}\"\nto be an installation of LogosBible v${LOGOS_VERSION} independent of other installations.\nPlease select the type of installation:" \
@@ -652,7 +656,7 @@ case "${installationChoice}" in
 
 		# check for wine installation
 		WINE_VERSION_CHECK="$(${WINE_EXE} --version)"
-		[ -z "${WINE_VERSION_CHECK}" ] && verbose && [[ no_zenity -eq 1 ]] && gtk_fatal_error "Wine64 not found! Please install native Wine64 first."
+		[ -z "${WINE_VERSION_CHECK}" ] && [[ no_zenity -eq 1 ]] && gtk_fatal_error "Wine64 not found! Please install native Wine64 first."
 		verbose && echo "Using: ${WINE_VERSION_CHECK}"
 
 		make_skel "64" "${WINE_EXE}" "none.AppImage"
@@ -678,7 +682,7 @@ case "${installationChoice}" in
 		export SET_APPIMAGE_URL="${WINE64_APPIMAGE_URL}"
 		;;
 	*)
-		verbose && [[ no_zenity -eq 1 ]] && gtk_fatal_error "Installation canceled!"
+		[[ no_zenity -eq 1 ]] && gtk_fatal_error "Installation canceled!"
 esac
 
 # exporting PATH to internal use if using AppImage, doing backup too:
@@ -694,16 +698,16 @@ if [ -z "${NO_APPIMAGE}" ] ; then
 	# Geting the AppImage:
 	if [ -f "${DOWNLOADED_RESOURCES}/${SET_APPIMAGE_FILENAME}" ]; then
 		verbose && echo "${SET_APPIMAGE_FILENAME} exist. Using it..."
-		if [[ verbose ]] && [[ no_zenity -eq 1 ]]; then
+		if [[ no_zenity -eq 1 ]]; then
 			cp "${DOWNLOADED_RESOURCES}/${SET_APPIMAGE_FILENAME}" "${APPDIR}/" | zenity --progress --title="Copying..." --text="Copying: ${SET_APPIMAGE_FILENAME}\ninto: ${APPDIR}" --pulsate --auto-close --no-cancel 
 	        else
 			cp "${DOWNLOADED_RESOURCES}/${SET_APPIMAGE_FILENAME}" "${APPDIR}/";
 		fi
 	else
 		verbose && echo "${SET_APPIMAGE_FILENAME} does not exist. Downloading..."
-		verbose && [[ no_zenity -eq 1 ]] && gtk_download "${SET_APPIMAGE_URL}" "${WORKDIR}"
+		[[ no_zenity -eq 1 ]] && gtk_download "${SET_APPIMAGE_URL}" "${WORKDIR}"
 
-		if [[ verbose ]] && [[ no_zenity -eq 1 ]]; then
+		if [[ no_zenity -eq 1 ]]; then
 			mv "${WORKDIR}/${SET_APPIMAGE_FILENAME}" "${APPDIR}" | zenity --progress --title="Moving..." --text="Moving: ${SET_APPIMAGE_FILENAME}\ninto: ${APPDIR}" --pulsate --auto-close --no-cancel
 		else
 			mv "${WORKDIR}/${SET_APPIMAGE_FILENAME}" "${APPDIR}";
@@ -719,7 +723,7 @@ fi
 
 light_wineserver_wait() {
 	verbose && echo "* Waiting for ${WINE_EXE} to end properly..."
-	if [[ verbose ]] && [[ no_zenity -eq 1 ]]; then
+	if [[ no_zenity -eq 1 ]]; then
 		wineserver -w | zenity --progress --title="Waiting ${WINE_EXE} proper end" --text="Waiting for ${WINE_EXE} to end properly..." --pulsate --auto-close --no-cancel
 	else
 		wineserver -w;
@@ -727,7 +731,7 @@ light_wineserver_wait() {
 }
 heavy_wineserver_wait() {
 	verbose && echo "* Waiting for ${WINE_EXE} to end properly..."
-	if [[ verbose ]] && [[ no_zenity -eq 1 ]]; then
+	if [[ no_zenity -eq 1 ]]; then
 		wait_process_using_dir "${WINEPREFIX}" | zenity --progress --title="Waiting ${WINE_EXE} proper end" --text="Waiting for ${WINE_EXE} to end properly..." --pulsate --auto-close --no-cancel
 		wineserver -w | zenity --progress --title="Waiting ${WINE_EXE} proper end" --text="Waiting for ${WINE_EXE} to end properly..." --pulsate --auto-close --no-cancel
 	else
@@ -736,11 +740,11 @@ heavy_wineserver_wait() {
 	fi
 }
 
-verbose && [[ no_zenity -eq 1 ]] && gtk_continue_question "Now the script will create and configure the Wine Bottle at ${WINEPREFIX}. You can cancel the instalation of Mono. Do you wish to continue?"
+[[ no_zenity -eq 1 ]] && gtk_continue_question "Now the script will create and configure the Wine Bottle at ${WINEPREFIX}. You can cancel the instalation of Mono. Do you wish to continue?"
 verbose && echo "================================================="
 verbose && echo "${WINE_EXE} wineboot"
 if [ -z "${WINEBOOT_GUI}" ]; then
-	if [[ verbose ]] && [[ no_zenity -eq 1 ]]; then
+	if [[ no_zenity -eq 1 ]]; then
 		(DISPLAY="" ${WINE_EXE} wineboot) | zenity --progress --title="Waiting ${WINE_EXE} wineboot" --text="Waiting for ${WINE_EXE} wineboot..." --pulsate --auto-close --no-cancel
 	else
 		(DISPLAY="" ${WINE_EXE} wineboot)
@@ -772,7 +776,7 @@ EOF
 wine_reg_install() {
 	REG_FILENAME="${1}"
 	verbose && echo "${WINE_EXE} regedit.exe ${REG_FILENAME}"
-	if [[ verbose ]] && [[ no_zenity -eq 1 ]]; then
+	if [[ no_zenity -eq 1 ]]; then
 		${WINE_EXE} regedit.exe "${WORKDIR}"/"${REG_FILENAME}" | zenity --progress --title="Wine regedit" --text="Wine is installing ${REG_FILENAME} in ${WINEPREFIX}" --pulsate --auto-close --no-cancel
 	else
 		${WINE_EXE} regedit.exe "${WORKDIR}"/"${REG_FILENAME}"
@@ -788,14 +792,14 @@ wine_reg_install "renderer_gdi.reg"
 verbose && echo "================================================="
 #-------------------------------------------------
 
-verbose && [[ no_zenity -eq 1 ]] && gtk_continue_question "Now the script will install the winetricks packages at ${WINEPREFIX}. Do you wish to continue?"
+[[ no_zenity -eq 1 ]] && gtk_continue_question "Now the script will install the winetricks packages at ${WINEPREFIX}. Do you wish to continue?"
 
 if [ -f "${DOWNLOADED_RESOURCES}/winetricks" ]; then
 	verbose && echo "winetricks exists. Using it..."
 	cp "${DOWNLOADED_RESOURCES}/winetricks" "${WORKDIR}"
 else
 	verbose && echo "winetricks does not exist. Downloading..."
-	verbose && [[ no_zenity -eq 1 ]] && gtk_download "${WINETRICKS_URL}" "${WORKDIR}"
+	[[ no_zenity -eq 1 ]] && gtk_download "${WINETRICKS_URL}" "${WORKDIR}"
 fi
 chmod +x "${WORKDIR}/winetricks"
 
@@ -807,7 +811,7 @@ winetricks_install() {
 	mkfifo "${pipe_winetricks}"
 
 	# zenity GUI feedback
-	verbose && [[ no_zenity -eq 1 ]] && zenity --progress --title="Winetricks ${*}" --text="Winetricks installing ${*}" --pulsate --auto-close < "${pipe_winetricks}" &
+	[[ no_zenity -eq 1 ]] && zenity --progress --title="Winetricks ${*}" --text="Winetricks installing ${*}" --pulsate --auto-close < "${pipe_winetricks}" &
 	ZENITY_PID="${!}"
 
 	#"${WORKDIR}"/winetricks "${@}" > "${pipe_winetricks}"
@@ -825,11 +829,11 @@ winetricks_install() {
 		if [ "${WINETRICKS_STATUS}" != "0" ] ; then
 			wineserver -k
 			verbose && echo "ERROR on : winetricks ${*}; WINETRICKS_STATUS: ${WINETRICKS_STATUS}"
-			verbose && [[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled because of sub-job failure!\n * winetricks ${*}\n  - WINETRICKS_STATUS: ${WINETRICKS_STATUS}"
+			[[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled because of sub-job failure!\n * winetricks ${*}\n  - WINETRICKS_STATUS: ${WINETRICKS_STATUS}"
 		fi
 	else
 		wineserver -k
-		verbose && [[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled!\n * ZENITY_RETURN: ${ZENITY_RETURN}"
+		[[ no_zenity -eq 1 ]] && gtk_fatal_error "The installation was cancelled!\n * ZENITY_RETURN: ${ZENITY_RETURN}"
 	fi
 	verbose && echo "winetricks ${*} DONE!"
 
@@ -858,21 +862,21 @@ else
 fi
 #-------------------------------------------------
 
-verbose && [[ no_zenity -eq 1 ]] && gtk_continue_question "Now the script will download and install Logos Bible at ${WINEPREFIX}. You will need to interact with the installer. Do you wish to continue?"
+[[ no_zenity -eq 1 ]] && gtk_continue_question "Now the script will download and install Logos Bible at ${WINEPREFIX}. You will need to interact with the installer. Do you wish to continue?"
 
 verbose && echo "================================================="
 # Geting and install the LogosBible:
 verbose && echo "Installing LogosBible 64bits..."
 if [ -f "${DOWNLOADED_RESOURCES}/${LOGOS64_MSI}" ]; then
 	verbose && echo "${LOGOS64_MSI} exist. Using it..."
-	if [[ verbose ]] && [[ no_zenity -eq 1 ]]; then
+	if [[ no_zenity -eq 1 ]]; then
 		cp "${DOWNLOADED_RESOURCES}/${LOGOS64_MSI}" "${WORKDIR}/" | zenity --progress --title="Copying..." --text="Copying: ${LOGOS64_MSI}\ninto: ${WORKDIR}" --pulsate --auto-close --no-cancel
 	else
 		cp "${DOWNLOADED_RESOURCES}/${LOGOS64_MSI}" "${WORKDIR}/"
 	fi
 else
 	verbose && echo "${LOGOS64_MSI} does not exist. Downloading..."
-	verbose && [[ no_zenity -eq 1 ]] && gtk_download "${LOGOS64_URL}" "${WORKDIR}"
+	[[ no_zenity -eq 1 ]] && gtk_download "${LOGOS64_URL}" "${WORKDIR}"
 fi
 verbose && echo "${WINE_EXE} msiexec /i ${LOGOS64_MSI}"
 ${WINE_EXE} msiexec /i "${WORKDIR}"/"${LOGOS64_MSI}"
@@ -886,7 +890,7 @@ verbose && echo "================================================="
 clean_all
 verbose && echo "================================================="
 
-if [[ verbose ]] && [[ no_zenity -eq 1 ]]; then
+if [[ no_zenity -eq 1 ]]; then
 	if gtk_question "Logos Bible Installed!\nYou can run it using the script Logos.sh inside ${INSTALLDIR}.\nDo you want to run it now?\nNOTE: Just close the error on the first execution."; then
 	"${INSTALLDIR}"/Logos.sh
 	fi
