@@ -34,7 +34,7 @@ if [ -z "${FORCE_ROOT+x}" ]; then export FORCE_ROOT="" ; fi
 if [ -z "${WINEBOOT_GUI+x}" ]; then export WINEBOOT_GUI="" ; fi
 export EXTRA_INFO="Usually is necessary: winbind cabextract libjpeg8."
 #=================================================
-VERBOSE=false
+VERBOSE=true
 #=================================================
 
 #======= Aux =============
@@ -48,7 +48,8 @@ Installs Logos Bible Software with Wine in an AppImage on Linux.
 Options:
     -h   --help         Prints this help message and exit.
     -v   --version      Prints version information and exit.
-    -q   --quiet      Makes the script output to the terminal. [WIP]
+    -q   --quiet        Makes the script quiet and non-interactive. Installs using native    wine. The installer will quietly fail. If successful, Logos will not automatically run.
+    -Z   --no-zenity    Disables Zenity. Install still requires X for install.
 EOF
 }
 
@@ -60,17 +61,19 @@ do
       set -- 
     fi  
     case "$arg" in
-        --help)    set -- "$@" -h ;;
-        --version) set -- "$@" -V ;;
-        --quiet) set -- "$@" -q ;;
-        *)         set -- "$@" "$arg" ;;
+        --help)      set -- "$@" -h ;;
+        --version)   set -- "$@" -V ;;
+        --quiet)     set -- "$@" -q ;;
+	--no-zenity) set -- "$@" -Z ;;
+        *)           set -- "$@" "$arg" ;;
     esac
 done
-while getopts ":hvq" opt; do
+while getopts ":hvqZ" opt; do
     case $opt in
         h)  usage && exit ;;
         v)  echo "$LOGOS_SCRIPT_TITLE, $THIS_SCRIPT_VERSION by $LOGOS_SCRIPT_AUTHOR." && exit;;
         q)  VERBOSE=true ;;
+	Z)  NO_ZENITY=true ;;
         \?) echo "$LOGOS_SCRIPT_TITLE: -$OPTARG: undefined option." >&2 && usage >&2 && exit ;;
         :)  echo "$LOGOS_SCRIPT_TITLE: -$OPTARG: missing argument." >&2 && usage >&2 && exit ;;
     esac
@@ -81,6 +84,10 @@ die() { echo >&2 "$*"; exit 1; };
 
 verbose() {
         [[ $VERBOSE = true ]] && return 0 || return 1
+}
+
+no_zenity() {
+	[[ $NO_ZENITY = true ]] && return 0 || return 1
 }
 
 have_dep() {
