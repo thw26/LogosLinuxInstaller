@@ -9,6 +9,8 @@ import time
 import tempfile
 import re
 import curses
+import requests
+from xml.etree import ElementTree as ET
 
 # Environment variables
 os.environ["LOGOS_SCRIPT_TITLE"] = "Logos Linux Installer"
@@ -583,12 +585,13 @@ def chooseProduct():
         print("Installing Logos Bible Software")
         os.environ["FLPRODUCT"] = "Logos"
         os.environ["FLPRODUCTi"] = "logos4" #This is the variable referencing the icon path name in the repo.
+        os.environ["VERBUM_PATH"] = "/"
     elif str(productChoice).startswith("Verbum"):
         verbose()
         print("Installing Verbum Bible Software")
         os.environ["FLPRODUCT"] = "Verbum"
         os.environ["FLPRODUCTi"] = "verbum" #This is the variable referencing the icon path name in the repo.
-        os.environ["VERBUM_PATH"] = "Verbum/"
+        os.environ["VERBUM_PATH"] = "/Verbum/"
     elif str(productChoice).startswith("Exit"):
         logos_error("Exiting installation.", "")
     else:
@@ -664,38 +667,49 @@ def chooseVersion():
     else:
         logos_error("Unknown version. Installation canceled!")
 
-    LOGOS_RELEASE_VERSION = subprocess.check_output(["curl", "-s", f"https://clientservices.logos.com/update/v1/feed/logos{TARGETVERSION}/stable.xml"]).decode().strip()
-    LOGOS_RELEASE_VERSION = subprocess.check_output(["xmllint", "--format", "-"]).decode().strip()
-    LOGOS_RELEASE_VERSION = subprocess.check_output(["sed", "-e", 's/ xmlns.*=".*"//g']).decode().strip()
-    LOGOS_RELEASE_VERSION = subprocess.check_output(["sed", "-e", 's@logos:minimum-os-version@minimum-os-version@g']).decode().strip()
-    LOGOS_RELEASE_VERSION = subprocess.check_output(["sed", "-e", 's@logos:version@version@g']).decode().strip()
-    LOGOS_RELEASE_VERSION = subprocess.check_output(["xmllint", "--xpath", "/feed/entry[1]/version/text()", "-"]).decode().strip()
-    export(LOGOS_RELEASE_VERSION)
+    url = f"https://clientservices.logos.com/update/v1/feed/logos{TARGETVERSION}/stable.xml"
+    response = requests.get(url)
+    if response.ok:
+        xml_data = response.text
+    else:
+        logos_error(f"Failed to get Logos XML feed. Request failed with status code: {response.status_code}")
+    root = ET.fromstring(xml_data)
+    entries = root.findall('{http://www.w3.org/2005/Atom}entry')
+    first_entry = entries[0]
+    version_element = first_entry.find('version')
+    minimum_os_version_element = first_entry.find('minimum-os-version')
+    LOGOS_RELEASE_VERSION=""
+    if version_element is not None:
+        LOGOS_RELEASE_VERSION = version_element.text.strip()
+    if minimum_os_version_element is not None:
+        minimum_os_version_element = minimum_os_version_element.text.strip()
+    os.environ["LOGOS_RELEASE_VERSION"] = LOGOS_RELEASE_VERSION
 
+    LOGOS64_URL=""
     if LOGOS64_URL is None or LOGOS64_URL == "":
-        LOGOS64_URL = f"https://downloads.logoscdn.com/LBS{TARGETVERSION}/{VERBUM_PATH}Installer/{LOGOS_RELEASE_VERSION}/{FLPRODUCT}-x64.msi"
-        export(LOGOS64_URL)
+        LOGOS64_URL = f"https://downloads.logoscdn.com/LBS{TARGETVERSION}{os.environ.get('VERBUM_PATH')}Installer/{LOGOS_RELEASE_VERSION}/{os.environ.get('FLPRODUCT')}-x64.msi"
+        os.environ['LOGOS64_URL'] = LOGOS64_URL
 
-    if FLPRODUCT == "Logos":
+    if os.environ.get('FLPRODUCT') == "Logos":
         LOGOS_VERSION = LOGOS64_URL.split('/')[6]
-    elif FLPRODUCT == "Verbum":
+    elif os.environ.get('FLPRODUCT') == "Verbum":
         LOGOS_VERSION = LOGOS64_URL.split('/')[7]
     else:
         logos_error("FLPRODUCT not set in config. Please update your config to specify either 'Logos' or 'Verbum'.")
-    export(LOGOS_VERSION)
+    os.environ['LOGOS_VERSION'] = LOGOS_VERSION
 
     LOGOS64_MSI = os.path.basename(LOGOS64_URL)
-    export(LOGOS64_MSI)
+    os.environ['LOGOS64_MSI'] = LOGOS64_MSI
     
-    if INSTALLDIR is None or INSTALLDIR == "":
-        INSTALLDIR = f"{HOME}/{FLPRODUCT}Bible{TARGETVERSION}"
-        export(INSTALLDIR)
-    if APPDIR is None or APPDIR == "":
+    if os.environ.get('INSTALLDIR') is None or os.environ.get('INSTALLDIR') == "":
+        INSTALLDIR = f"{os.environ.get('HOME')}/{os.environ.get('FLPRODUCT')}Bible{TARGETVERSION}"
+        os.environ['INSTALLDIR'] = INSTALLDIR
+    if os.environ.get('APPDIR') is None or os.environ.get('APPDIR') == "":
         APPDIR = f"{INSTALLDIR}/data"
-        export(APPDIR)
-    if APPDIR_BINDIR is None or APPDIR_BINDIR == "":
+        os.environ['APPDIR'] = APPDIR
+    if os.environ.get('APPDIR_BINDIR') is None or os.environ.get('APPDIR_BINDIR') == "":
         APPDIR_BINDIR = f"{APPDIR}/bin"
-        export(APPDIR_BINDIR)
+        os.environ['APPDIR_BINDIR'] = APPDIR_BINDIR
 
 def wineBinaryVersionCheck(TESTBINARY, TARGETVERSION):
     # Does not check for Staging. Will not implement: expecting merging of commits in time.
