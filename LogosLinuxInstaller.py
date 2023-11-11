@@ -557,7 +557,7 @@ def chooseProduct():
         
                 # Get user input
                 key = stdscr.getch()
-        
+
                 # Process user input
                 if key == curses.KEY_UP:
                     current_option = max(0, current_option-1)
@@ -565,6 +565,8 @@ def chooseProduct():
                     current_option = min(len(options)-1, current_option+1)
                 elif key == ord('\n'):  # User presses Enter
                     productChoice = options[current_option]
+                    break
+            curses.endwin()
         elif DIALOG == "zenity":
             process = subprocess.Popen(["zenity", "--width=700", "--height=310", "--title=" + TITLE, "--text=" + QUESTION_TEXT, "--list", "--radiolist", "--column", "S", "--column", "Description", "TRUE", "Logos Bible Software.", "FALSE", "Verbum Bible Software.", "FALSE", "Exit."], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             productChoice, _ = process.communicate()
@@ -596,9 +598,11 @@ def chooseProduct():
         os.environ["LOGOS_ICON_URL"] = "https://raw.githubusercontent.com/ferion11/LogosLinuxInstaller/master/img/" + os.environ.get("FLPRODUCTi") + "-128-icon.png"
 
 def chooseVersion():
+    TARGETVERSION = os.environ.get('TARGETVERSION')
+    DIALOG = os.environ.get('DIALOG')
     BACKTITLE = "Choose Version Menu"
     TITLE = "Choose Product Version"
-    QUESTION_TEXT = f"Which version of {FLPRODUCT} should the script install?"
+    QUESTION_TEXT = f"Which version of {os.environ.get('FLPRODUCT')} should the script install?"
     if TARGETVERSION is None or TARGETVERSION == "":
         if DIALOG == "whiptail" or DIALOG == "dialog":
             if DIALOG in ["whiptail", "dialog"]:
@@ -637,6 +641,8 @@ def chooseVersion():
                         current_option = min(len(options)-1, current_option+1)
                     elif key == ord('\n'):  # User presses Enter
                         versionChoice = options[current_option]
+                        break
+                curses.endwin()
         elif DIALOG == "zenity":
             command = ["zenity", "--width=700", "--height=310", "--title", TITLE, "--text", QUESTION_TEXT, "--list", "--radiolist", "--column", "S", "--column", "Description", "TRUE", f"{FLPRODUCT} 10", "FALSE", f"{FLPRODUCT} 9", "FALSE", "Exit"]
             versionChoice = subprocess.check_output(command, stderr=subprocess.STDOUT).decode().strip()
