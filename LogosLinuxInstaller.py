@@ -8,6 +8,7 @@ import datetime
 import time
 import tempfile
 import re
+import curses
 
 # Environment variables
 os.environ["LOGOS_SCRIPT_TITLE"] = "Logos Linux Installer"
@@ -529,7 +530,41 @@ def chooseProduct():
     if not os.environ.get("FLPRODUCT"):
         DIALOG = os.environ.get("DIALOG")
         if DIALOG in ["whiptail", "dialog"]:
-            productChoice = subprocess.call([ "whiptail", "--backtitle", BACKTITLE, "--title", TITLE, "--radiolist", QUESTION_TEXT, "0", "0", "0", "Logos", "Logos Bible Software.", "ON", "Verbum", "Verbum Bible Software.", "OFF", "Exit", "Exit.", "OFF" ], stderr=subprocess.PIPE, text=True)
+            # Set up the screen
+            stdscr = curses.initscr()
+            curses.curs_set(0)
+            stdscr.nodelay(1)
+            stdscr.timeout(100)
+        
+            # Define the options for the radio list
+            options = ["Logos", "Verbum", "Exit"]
+            current_option = 0
+        
+            while True:
+                stdscr.clear()
+                height, width = stdscr.getmaxyx()
+        
+                # Display the radio list options
+                for i, option in enumerate(options):
+                    x = width//2 - len(option)//2
+                    y = height//2 - len(options)//2 + i
+                    if i == current_option:
+                        stdscr.attron(curses.A_REVERSE)
+                        stdscr.addstr(y, x, option)
+                        stdscr.attroff(curses.A_REVERSE)
+                    else:
+                        stdscr.addstr(y, x, option)
+        
+                # Get user input
+                key = stdscr.getch()
+        
+                # Process user input
+                if key == curses.KEY_UP:
+                    current_option = max(0, current_option-1)
+                elif key == curses.KEY_DOWN:
+                    current_option = min(len(options)-1, current_option+1)
+                elif key == ord('\n'):  # User presses Enter
+                    productChoice = options[current_option]
         elif DIALOG == "zenity":
             process = subprocess.Popen(["zenity", "--width=700", "--height=310", "--title=" + TITLE, "--text=" + QUESTION_TEXT, "--list", "--radiolist", "--column", "S", "--column", "Description", "TRUE", "Logos Bible Software.", "FALSE", "Verbum Bible Software.", "FALSE", "Exit."], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             productChoice, _ = process.communicate()
@@ -540,18 +575,19 @@ def chooseProduct():
     else:
         productChoice = os.environ.get("FLPRODUCT")
 
-    if productChoice.startswith("Logos"):
+    print("productChoice:" + str(productChoice))
+    if str(productChoice).startswith("Logos"):
         verbose()
         print("Installing Logos Bible Software")
         os.environ["FLPRODUCT"] = "Logos"
         os.environ["FLPRODUCTi"] = "logos4" #This is the variable referencing the icon path name in the repo.
-    elif productChoice.startswith("Verbum"):
+    elif str(productChoice).startswith("Verbum"):
         verbose()
         print("Installing Verbum Bible Software")
         os.environ["FLPRODUCT"] = "Verbum"
         os.environ["FLPRODUCTi"] = "verbum" #This is the variable referencing the icon path name in the repo.
         os.environ["VERBUM_PATH"] = "Verbum/"
-    elif productChoice.startswith("Exit"):
+    elif str(productChoice).startswith("Exit"):
         logos_error("Exiting installation.", "")
     else:
         logos_error("Unknown product. Installation canceled!", "")
@@ -565,8 +601,42 @@ def chooseVersion():
     QUESTION_TEXT = f"Which version of {FLPRODUCT} should the script install?"
     if TARGETVERSION is None or TARGETVERSION == "":
         if DIALOG == "whiptail" or DIALOG == "dialog":
-            command = [DIALOG, "--backtitle", BACKTITLE, "--title", TITLE, "--radiolist", QUESTION_TEXT, "0", "0", "0", f"{FLPRODUCT} 10", "10", "ON", f"{FLPRODUCT} 9", "9", "OFF", "Exit.", "Exit.", "OFF"]
-            versionChoice = subprocess.check_output(command, stderr=subprocess.STDOUT).decode().strip()
+            if DIALOG in ["whiptail", "dialog"]:
+                # Set up the screen
+                stdscr = curses.initscr()
+                curses.curs_set(0)
+                stdscr.nodelay(1)
+                stdscr.timeout(100)
+        
+                # Define the options for the radio list
+                options = ["10", "9", "Exit"]
+                current_option = 0
+        
+                while True:
+                    stdscr.clear()
+                    height, width = stdscr.getmaxyx()
+        
+                    # Display the radio list options
+                    for i, option in enumerate(options):
+                        x = width//2 - len(option)//2
+                        y = height//2 - len(options)//2 + i
+                        if i == current_option:
+                            stdscr.attron(curses.A_REVERSE)
+                            stdscr.addstr(y, x, option)
+                            stdscr.attroff(curses.A_REVERSE)
+                        else:
+                            stdscr.addstr(y, x, option)
+        
+                    # Get user input
+                    key = stdscr.getch()
+        
+                    # Process user input
+                    if key == curses.KEY_UP:
+                        current_option = max(0, current_option-1)
+                    elif key == curses.KEY_DOWN:
+                        current_option = min(len(options)-1, current_option+1)
+                    elif key == ord('\n'):  # User presses Enter
+                        versionChoice = options[current_option]
         elif DIALOG == "zenity":
             command = ["zenity", "--width=700", "--height=310", "--title", TITLE, "--text", QUESTION_TEXT, "--list", "--radiolist", "--column", "S", "--column", "Description", "TRUE", f"{FLPRODUCT} 10", "FALSE", f"{FLPRODUCT} 9", "FALSE", "Exit"]
             versionChoice = subprocess.check_output(command, stderr=subprocess.STDOUT).decode().strip()
