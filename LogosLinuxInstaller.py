@@ -529,8 +529,7 @@ def chooseProduct():
     if not os.environ.get("FLPRODUCT"):
         DIALOG = os.environ.get("DIALOG")
         if DIALOG in ["whiptail", "dialog"]:
-            command = [ DIALOG, "--backtitle", BACKTITLE, "--title", TITLE, "--radiolist", QUESTION_TEXT, ] + [ "0", "0", "0", "Logos", "Logos Bible Software.", "ON", "Verbum", "Verbum Bible Software.", "OFF", "Exit", "Exit.", "OFF" ]
-            productChoice = subprocess.check_output(command, stderr=subprocess.PIPE, text=True)
+            productChoice = subprocess.call([ "whiptail", "--backtitle", BACKTITLE, "--title", TITLE, "--radiolist", QUESTION_TEXT, "0", "0", "0", "Logos", "Logos Bible Software.", "ON", "Verbum", "Verbum Bible Software.", "OFF", "Exit", "Exit.", "OFF" ], stderr=subprocess.PIPE, text=True)
         elif DIALOG == "zenity":
             process = subprocess.Popen(["zenity", "--width=700", "--height=310", "--title=" + TITLE, "--text=" + QUESTION_TEXT, "--list", "--radiolist", "--column", "S", "--column", "Description", "TRUE", "Logos Bible Software.", "FALSE", "Verbum Bible Software.", "FALSE", "Exit."], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             productChoice, _ = process.communicate()
