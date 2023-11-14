@@ -316,15 +316,16 @@ def curses_menu(options, title, question_text):
     curses.curs_set(0)
 
     current_option = 0
+    current_page = 0
+    options_per_page = 5
+    total_pages = (len(options) - 1) // options_per_page + 1
 
     while True:
         stdscr.clear()
 
         window_height, window_width = stdscr.getmaxyx()
-        window_y = window_height // 2 - len(options) // 2
+        window_y = window_height // 2 - options_per_page // 2
         window_x = window_width // 2 - max(len(option) for option in options) // 2
-        #window_y = max(0, current_option - window_height // 2)
-        #window_x = 0  # You can adjust this based on your layout
 
         # Wrap the title and question text
         wrapped_title = textwrap.fill(title, window_width - 4)
@@ -348,14 +349,21 @@ def curses_menu(options, title, question_text):
 
         # Display the options, centered
         options_start_y = question_start_y + len(question_lines) + 2
-        for i, option in enumerate(options):
-            x = window_width // 2 - len(option) // 2
-            y = options_start_y + i
-            if y < window_height:
-                if i == current_option:
-                    stdscr.addstr(y, x, option, curses.A_REVERSE)
-                else:
-                    stdscr.addstr(y, x, option)
+        for i in range(options_per_page):
+            index = current_page * options_per_page + i
+            if index < len(options):
+                option = options[index]
+                x = window_width // 2 - len(option) // 2
+                y = options_start_y + i
+                if y < window_height:
+                    if index == current_option:
+                        stdscr.addstr(y, x, option, curses.A_REVERSE)
+                    else:
+                        stdscr.addstr(y, x, option)
+
+        # Display pagination information
+        page_info = f"Page {current_page + 1}/{total_pages} | Selected Option: {current_option + 1}/{len(options)}"
+        stdscr.addstr(window_height - 1, 2, page_info, curses.A_BOLD)
 
         # Refresh the windows
         stdscr.refresh()
@@ -363,10 +371,29 @@ def curses_menu(options, title, question_text):
         # Get user input
         key = stdscr.getch()
 
-        if key == 65:
-            current_option = max(0, current_option-1)
-        elif key == 66:
-            current_option = min(len(options)-1, current_option+1)
+        if key == 65: # Up arrow
+            if current_option == current_page * options_per_page and current_page > 0:
+                # Move to the previous page
+                current_page -= 1
+                current_option = min(len(options) - 1, (current_page + 1) * options_per_page - 1)
+            elif current_option == 0:
+                if total_pages == 1:
+                    current_option = len(options) - 1
+                else:
+                    current_page = total_pages - 1
+                    current_option = len(options) - 1
+            else:
+                current_option = max(0, current_option - 1)
+        elif key == 66: # Down arrow
+            if current_option == (current_page + 1) * options_per_page - 1 and current_page < total_pages -1:
+                # Move to the next page
+                current_page += 1
+                current_option = min(len(options) - 1, current_page * options_per_page)
+            elif current_option == len(options) - 1:
+                current_page = 0
+                current_option = 0
+            else:
+                current_option = min(len(options) - 1, current_option + 1)
         elif key == ord('\n'): # Enter key
             choice = options[current_option]
             break
