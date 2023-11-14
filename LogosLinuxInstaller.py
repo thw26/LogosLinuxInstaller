@@ -674,7 +674,9 @@ def chooseProduct():
     if not os.environ.get("LOGOS_ICON_URL"):
         os.environ["LOGOS_ICON_URL"] = "https://raw.githubusercontent.com/ferion11/LogosLinuxInstaller/master/img/" + os.environ.get("FLPRODUCTi") + "-128-icon.png"
 
-def getLogosReleaseVersion(TARGETVERSION):
+def getLogosReleaseVersion(targetversion):
+    global TARGETVERSION
+    os.environ['TARGETVERSION'] = TARGETVERSION = targetversion
     url = f"https://clientservices.logos.com/update/v1/feed/logos{TARGETVERSION}/stable.xml"
 
     try:
@@ -690,17 +692,6 @@ def getLogosReleaseVersion(TARGETVERSION):
             'ns0': 'http://www.w3.org/2005/Atom',
             'ns1': 'http://services.logos.com/update/v1/'
         }
-        # Define the pattern to find the version string
-        #pattern = re.compile(r'version="([\d.]+)"')
-
-        # Search for the pattern in the XML data
-        #match = pattern.search(xmldata)
-
-        # Check if a match is found
-        #if match:
-        #    logos_release_version = match.group(1)
-        #else:
-        #    print("Version not found")
 
         # Extract versions
         releases = []
@@ -717,7 +708,7 @@ def getLogosReleaseVersion(TARGETVERSION):
 
         TITLE=f"Choose {FLPRODUCT} {TARGETVERSION} Release"
         QUESTION_TEXT=f"Which version of {FLPRODUCT} {TARGETVERSION} do you want to install?"
-        curses_menu(releases, TITLE, QUESTION_TEXT)
+        logos_release_version = curses_menu(releases, TITLE, QUESTION_TEXT)
     except requests.RequestException as e:
         print(f"Error fetching or parsing XML: {e}")
         return None
