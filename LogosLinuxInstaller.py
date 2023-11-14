@@ -352,14 +352,14 @@ def curses_menu(options, title, question_text):
         for i in range(options_per_page):
             index = current_page * options_per_page + i
             if index < len(options):
-                option = options[index]
-                x = window_width // 2 - len(option) // 2
+                option = str(options[index])
+                x = window_width // 2 - len(str(option)) // 2
                 y = options_start_y + i
                 if y < window_height:
                     if index == current_option:
-                        stdscr.addstr(y, x, option, curses.A_REVERSE)
+                        stdscr.addstr(y, x, str(option), curses.A_REVERSE)
                     else:
-                        stdscr.addstr(y, x, option)
+                        stdscr.addstr(y, x, str(option))
 
         # Display pagination information
         page_info = f"Page {current_page + 1}/{total_pages} | Selected Option: {current_option + 1}/{len(options)}"
@@ -796,34 +796,43 @@ def wineBinaryVersionCheck(TESTBINARY):
         raise ValueError("TARGETVERSION not set.")
 
     # Check if the binary is executable. If so, check if TESTBINARY's version is ≥ WINE_MINIMUM, or if it is Proton or a link to a Proton binary, else remove.
-    if os.path.exists(TESTBINARY) and os.access(TESTBINARY, os.X_OK):
-        cmd = [TESTBINARY, "--version"]
-        version_string = subprocess.check_output(cmd).decode("utf-8")
-        version_number = version_string.split("-")[-1]
-        print("version_string:" + version_string)
-        print("version_number:" + str(version_number))
-        if version_number is not None:
-            TESTWINEVERSION = float(version_number)
-            if TESTWINEVERSION >= float(WINE_MINIMUM):
-                if TESTWINEVERSION != 8.0:
-                    return True
-            elif "Proton - Experimental" in TESTBINARY:
-                return True
-            # If it is a symlink, check its actual path. If it is Proton, let it pass.
-            elif os.path.islink(TESTBINARY):
-                TESTWINE = os.path.realpath(TESTBINARY)
-                if "Proton - Experimental" in TESTWINE:
-                    return True
-            else:
-                return False
+    if not os.path.exists(TESTBINARY):
+        reason = "Binary does not exist."
+        return False, reason
+
+    if not os.access(TESTBINARY, os.X_OK):
+        reason = "Binary is not executable."
+        return False, reason
+
+    cmd = [TESTBINARY, "--version"]
+    version_string = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode("utf-8")
+    version_number = version_string.split("-")[-1]
+
+    if version_number is None:
+        reason = "Version is none."
+        return False, reason
+
+    TESTWINEVERSION = float(version_number)
+
+    if TESTWINEVERSION == 8.0:
+        reason = "Version is 8.0."
+        return False, reason
+
+    if "Proton" in TESTBINARY or ("Proton" in os.path.realpath(TESTBINARY) if os.path.islink(TESTBINARY) else False):
+        if TESTWINEVERSION == 7.0:
+            return True, "None"
         else:
-            TESTWINEVERSION = None
-    else:
-        return False
+            reason = "Proton version is too low."
+            return False, reason
+
+    if TESTWINEVERSION < float(WINE_MINIMUM):
+        reason = "Version is below minimum required."
+        return False, reason
+
+    return True, "None"
 
 def createWineBinaryList():
     logos_info("Creating binary list.")
-    WORKDIR = os.environ.get("WORKDIR")
     # TODO: Make optarg to add custom path to this list.
     CUSTOMBINPATH = os.environ.get("CUSTOMBINPATH", "")
 
@@ -848,13 +857,13 @@ def createWineBinaryList():
         if os.path.exists(binary_path) and os.access(binary_path, os.X_OK):
             binaries.append(binary_path)
 
-    print("BINARIES:", binaries)
-
     for binary in binaries[:]:
-        if wineBinaryVersionCheck(binary):
+        output1, output2 = wineBinaryVersionCheck(binary)
+        if output1 is not None and output1:
             continue
         else:
             binaries.remove(binary)
+            print(f"Removing binary:", binary, "because:", output2)
     
     return binaries
 
@@ -869,9 +878,9 @@ def chooseInstallMethod():
         # Add AppImage to list
         if os.environ["TARGETVERSION"] != "9":
             if os.environ.get('DIALOG') in ["whiptail", "dialog", "curses"]:
-                WINEBIN_OPTIONS.append([f"AppImage {os.environ['APPDIR_BINDIR']}/{os.environ['WINE64_APPIMAGE_FULL_FILENAME']}", f"AppImage of Wine64 {os.environ['WINE64_APPIMAGE_FULL_VERSION']}"])
+                WINEBIN_OPTIONS.append(["AppImage", f"{os.environ['APPDIR_BINDIR']}/{os.environ['WINE64_APPIMAGE_FULL_FILENAME']}", f"AppImage of Wine64 {os.environ['WINE64_APPIMAGE_FULL_VERSION']}"])
             elif DIALOG == "zenity":
-                WINEBIN_OPTIONS.append("TRUE AppImage AppImage of Wine64 " + os.environ["WINE64_APPIMAGE_FULL_VERSION"] + " " + os.path.join(os.environ["APPDIR_BINDIR"], os.environ["WINE64_APPIMAGE_FULL_FILENAME"]))
+                WINEBIN_OPTIONS.append(["FALSE", "AppImage", f"AppImage of Wine64 {os.environ['WINE64_APPIMAGE_FULL_VERSION']}", os.path.join(os.environ["APPDIR_BINDIR"], os.environ["WINE64_APPIMAGE_FULL_FILENAME"])])
             elif os.environ["DIALOG"] == "kdialog":
                 no_diag_msg("kdialog not implemented.")
             else:
@@ -896,9 +905,9 @@ def chooseInstallMethod():
 
             # Create wine binary option array
             if os.environ.get('DIALOG') in ["whiptail", "dialog", "curses"]:
-                WINEBIN_OPTIONS.append(WINEBIN_CODE + " " + WINEBIN_PATH + " " + WINEBIN_DESCRIPTION + " OFF")
+                WINEBIN_OPTIONS.append([WINEBIN_CODE, WINEBIN_PATH, WINEBIN_DESCRIPTION])
             elif os.environ["DIALOG"] == "zenity":
-                WINEBIN_OPTIONS.append("FALSE " + WINEBIN_CODE + " " + WINEBIN_DESCRIPTION + " " + WINEBIN_PATH)
+                WINEBIN_OPTIONS.append([WINEBIN_CODE, WINEBIN_DESCRIPTION, WINEBIN_PATH])
             elif os.environ["DIALOG"] == "kdialog":
                 no_diag_msg("kdialog not implemented.")
             else:
@@ -912,9 +921,9 @@ def chooseInstallMethod():
         QUESTION_TEXT=f"Which Wine binary and install method should the script use to install {FLPRODUCT} v{LOGOS_VERSION} in {INSTALLDIR}?"
 
     if os.environ.get('DIALOG') in ["whiptail", "dialog", "curses"]:
-        installationChoice = curses_menu(binaries, TITLE, QUESTION_TEXT)
-        WINECHOICE_CODE = installChoice[0]
-        WINE_EXE = installChoice[2]
+        installationChoice = curses_menu(WINEBIN_OPTIONS, TITLE, QUESTION_TEXT)
+        WINECHOICE_CODE = installationChoice[0]
+        WINE_EXE = installationChoice[1]
     elif os.environ["DIALOG"] == "zenity":
         column_names = ["--column", "Choice", "--column", "Code", "--column", "Description", "--column", "Path"]
         installationChoice = subprocess.check_output(["zenity", "--width=1024", "--height=480", "--title=" + TITLE, "--text=" + QUESTION_TEXT, "--list", "--radiolist"] + column_names + WINEBIN_OPTIONS + ["--print-column=2,3,4"]).decode().strip()
