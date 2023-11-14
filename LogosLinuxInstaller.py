@@ -254,7 +254,7 @@ def logos_error(message, secondary):
             file.write(f"{datetime.now()} {message}\n")
     elif DIALOG == "kdialog":
         pass
-    if not secondary:
+    if not secondary or secondary == "":
         subprocess.run(["rm", "/tmp/LogosLinuxInstaller.pid"])
         pgid = subprocess.check_output(['ps', '-o', 'pgid=', '-p', str(os.getpid())]).decode().strip()
         subprocess.run(['kill', '-SIGKILL', '-'+pgid], check=True)
@@ -606,6 +606,7 @@ def make_skel(SET_APPIMAGE_FILENAME):
     print("skel64 done!")
 
 def check_commands(*cmds):
+    EXTRA_INFO = os.environ.get('EXTRA_INFO')
     MISSING_CMD = []
     for cmd in cmds:
         if have_dep(cmd):
@@ -621,18 +622,19 @@ def check_commands(*cmds):
 
 def have_lib(lib):
     try:
-        subprocess.check_output(["ldconfig -N -v", lib])
+        subprocess.check_output(["ldconfig", "-N", "-v"]).decode('utf-8').count(lib)
         return True
     except FileNotFoundError:
         return False
 
 def check_libs(*libs):
+    EXTRA_INFO = os.environ.get('EXTRA_INFO')
     for lib in libs:
         if have_lib(lib):
             verbose()
             print(f"* {lib} is installed!")
         else:
-            logos_error(f"Your system does not have lib: {lib}. Please install {lib} package.\n {EXTRA_INFO}")
+            logos_error(f"Your system does not have lib: {lib}. Please install {lib} package.\n {EXTRA_INFO}", "")
 
 def checkDependencies():
     verbose()
@@ -951,6 +953,8 @@ def chooseInstallMethod():
     else:
         no_diag_msg("No dialog tool found.")
 
+    os.environ['WINEBIN_CODE'] = WINECHOICE_CODE
+    os.environ['WINE_EXE'] = WINE_EXE
     verbose()
     print(f"chooseInstallMethod(): WINEBIN_CODE: {WINECHOICE_CODE}; WINE_EXE: {WINE_EXE}")
 
@@ -972,6 +976,8 @@ def checkExistingInstall():
 
 
 def beginInstall():
+    SKEL = os.environ.get('SKEL')
+    WINEBIN_CODE = os.environ.get('WINEBIN_CODE')
     if SKEL == "1":
         if verbose:
             print("Making a skeleton install of the project only. Exiting after completion.")
