@@ -525,6 +525,7 @@ def logos_download(uri, destination):
         raise Exception("No dialog tool found.")
 
 def logos_reuse_download(SOURCEURL, FILE, TARGETDIR):
+    INSTALLDIR = os.environ.get('INSTALLDIR')
     DOWNLOADS = os.path.expanduser("~/Downloads")
     DIRS = [
         INSTALLDIR,
@@ -546,6 +547,9 @@ def logos_reuse_download(SOURCEURL, FILE, TARGETDIR):
         logos_progress("Copying…", f"Copying: {FILE}\ninto: {TARGETDIR}")
 
 def getAppImage():
+    WINE64_APPIMAGE_FULL_URL = os.environ.get('WINE64_APPIMAGE_FULL_URL')
+    WINE64_APPIMAGE_FULL_FILENAME = os.environ.get('WINE64_APPIMAGE_FULL_FILENAME')
+    APPDIR_BINDIR = os.environ.get('APPDIR_BINDIR')
     logos_reuse_download(WINE64_APPIMAGE_FULL_URL, WINE64_APPIMAGE_FULL_FILENAME, APPDIR_BINDIR)
 
 def wait_process_using_dir(directory):
@@ -990,6 +994,7 @@ def beginInstall():
     WINE64_APPIMAGE_FULL_VERSION = os.environ.get('WINE64_APPIMAGE_FULL_VERSION')
     WINE64_APPIMAGE_FULL_FILENAME = os.environ.get('WINE64_APPIMAGE_FULL_FILENAME')
     APPDIR_BINDIR = os.environ.get('APPDIR_BINDIR')
+    WINE_EXE = os.environ.get('WINE_EXE')
     if SKEL == "1":
         if verbose:
             print("Making a skeleton install of the project only. Exiting after completion.")
@@ -1027,6 +1032,7 @@ def beginInstall():
         print(f"Using: {wine_version}")
 
     # Set WINESERVER_EXE based on WINE_EXE.
+    WINESERVER_EXE = os.environ.get('WINESERVER_EXE')
     if not WINESERVER_EXE or WINESERVER_EXE == "":
         wineserver_path = os.path.join(os.path.dirname(WINE_EXE), "wineserver")
         if os.path.exists(wineserver_path):
@@ -1035,8 +1041,10 @@ def beginInstall():
             print(f"{wineserver_path} not found. Please either add it or create a symlink to it, and rerun.")
 
 def prepareWineBottle():
-    logos_continue_question("Now the script will create and configure the Wine Bottle at {}. You can cancel the installation of Mono. Do you wish to continue?".format(WINEPREFIX), "The installation was cancelled!")
-    verboseCode()
+    WINEPREFIX = os.environ.get('WINEPREFIX')
+    WINEBOOT_GUI = os.environ.get('WINEBOOT_GUI')
+    logos_continue_question(
+        f"Now the script will create and configure the Wine Bottle at {WINEPREFIX}. You can cancel the installation of Mono. Do you wish to continue?", f"The installation was cancelled!", "")
     if not WINEBOOT_GUI:
         subprocess.Popen(["DISPLAY=","wineboot"], stdout=subprocess.PIPE).communicate()
     else:
@@ -1044,16 +1052,20 @@ def prepareWineBottle():
     light_wineserver_wait()
 
 def wine_reg_install(REG_FILENAME):
-    verboseCode()
+    WORKDIR = os.environ.get('WORKDIR')
     subprocess.Popen(["regedit.exe", REG_FILENAME], cwd=WORKDIR).communicate()
     light_wineserver_wait()
-    verboseCode()
     
 def downloadWinetricks():
+    APPDIR_BINDIR = os.environ.get('APPDIR_BINDIR')
+    WINETRICKS_URL = os.environ.get('WINETRICKS_URL')
     logos_reuse_download(WINETRICKS_URL, "winetricks", APPDIR_BINDIR)
     subprocess.Popen(["chmod", "755" "{}/winetricks".format(APPDIR_BINDIR)], stdout=subprocess.PIPE).communicate()
 
 def setWinetricks():
+    APPDIR_BINDIR = os.environ.get('APPDIR_BINDIR')
+    WINETRICKSBIN = os.environ.get('WINETRICKSBIN')
+    DIALOG = os.environ.get('DIALOG')
     # Check if local winetricks version available; else, download it
     if not "WINETRICKSBIN" in os.environ:
         if subprocess.call(["which", "winetricks"]) == 0:
@@ -1064,11 +1076,8 @@ def setWinetricks():
                 title = "Choose Winetricks"
                 question_text = "Should the script use the system's local winetricks or download the latest winetricks from the Internet? The script needs to set some Wine options that FLPRODUCT requires on Linux."
                 if os.environ.get('DIALOG') in ["whiptail", "dialog", "curses"]:
-                    dialog_choice = subprocess.Popen(
-                        [os.getenv("DIALOG"), "--backtitle", backtitle, "--title", title, "--radiolist", question_text, "0", "0", "0", "1", "Use local winetricks.", "ON", "2", "Download winetricks from the Internet."], 
-                        stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                    )
-                    winetricks_choice = dialog_choice.communicate()[0]
+                    options = ["1: Use local winetricks.", "2: Download winetricks from the Internet"]
+                    winetricks_choice = curses_menu()
                 elif os.getenv("DIALOG") == "zenity":
                     dialog_choice = subprocess.Popen(
                         ["zenity", "--width=700", "--height=310", "--title=" + title, "--text=" + question_text, "--list", "--radiolist", "--column", "S", "--column", "Description", "TRUE", "1- Use local winetricks.", "FALSE", "2- Download winetricks from the Internet."], 
@@ -1101,7 +1110,7 @@ def setWinetricks():
 
 def winetricks_install(*args):
     verbose and print("winetricks", *args)
-    if DIALOG == "whiptail" or DIALOG == "dialog":
+    if DIALOG in ["whiptail", "dialog", 'curses']:
         subprocess.call([WINETRICKSBIN, *args])
     elif DIALOG == "zenity":
         pipe_winetricks = tempfile.mktemp()
@@ -1139,13 +1148,18 @@ def winetricks_install(*args):
     heavy_wineserver_wait()
 
 def winetricks_dll_install(*args):
+    WINETRICKSBIN = os.environ.get('WINETRICKSBIN')
     verbose and print("winetricks", *args)
-    logos_continue_question("Now the script will install the DLL " + " ".join(args) + ". This may take a while. There will not be any GUI feedback for this. Continue?", "The installation was cancelled!")
+    logos_continue_question("Now the script will install the DLL " + " ".join(args) + ". This may take a while. There will not be any GUI feedback for this. Continue?", "The installation was cancelled!", "")
     subprocess.call([WINETRICKSBIN, *args])
     verbose and print("winetricks", *args, "DONE!")
     heavy_wineserver_wait()
 
 def getPremadeWineBottle():
+    WINE64_BOTTLE_TARGZ_URL = os.environ.get('WINE64_BOTTLE_TARGZ_URL')
+    WINE64_BOTTLE_TARGZ_NAME = os.environ.get('WINE64_BOTTLE_TARGZ_NAME')
+    WORKDIR = os.environ.get('WORKDIR')
+    APPDIR = os.environ.get('APPDIR')
     verbose and print("Installing pre-made wineBottle 64bits…")
     logos_reuse_download(WINE64_BOTTLE_TARGZ_URL, WINE64_BOTTLE_TARGZ_NAME, WORKDIR)
     subprocess.call(["tar", "xzf", os.path.join(WORKDIR, WINE64_BOTTLE_TARGZ_NAME), "-C", APPDIR])
@@ -1154,11 +1168,19 @@ def getPremadeWineBottle():
 ## END WINE BOTTLE AND WINETRICKS FUNCTIONS
 ## BEGIN LOGOS INSTALL FUNCTIONS
 def get_logos_executable():
+    LOGOS_EXECUTABLE = os.environ.get('LOGOS_EXECUTABLE')
+    LOGOS64_URL = os.environ.get('LOGOS64_URL')
+    LOGOS64_MSI = os.environ.get('LOGOS64_MSI')
+    FLPRODUCT = os.environ.get('FLPRODUCT')
+    LOGOS_VERSION = os.environ.get('LOGOS_VERSION')
+    PRESENT_WORKING_DIRECTORY = os.environ.get('PRESENT_WORKING_DIRECTORY')
+    APPDIR = os.environ.get('APPDIR')
+    HOME = os.environ.get('HOME')
     # This VAR is used to verify the downloaded MSI is latest
     if not LOGOS_EXECUTABLE:
         LOGOS_EXECUTABLE = f"{FLPRODUCT}_v{LOGOS_VERSION}-x64.msi"
     
-    logos_continue_question("Now the script will check for the MSI installer. Then it will download and install {FLPRODUCT} Bible at {WINEPREFIX}. You will need to interact with the installer. Do you wish to continue?", "The installation was cancelled!")
+    logos_continue_question(f"Now the script will check for the MSI installer. Then it will download and install {FLPRODUCT} Bible at {WINEPREFIX}. You will need to interact with the installer. Do you wish to continue?", "The installation was cancelled!", "")
     
     # Getting and installing {FLPRODUCT} Bible
     # First check current directory to see if the .MSI is present; if not, check user's Downloads/; if not, download it new. Once found, copy it to WORKDIR for future use.
@@ -1176,6 +1198,9 @@ def get_logos_executable():
         shutil.copy(f"{HOME}/Downloads/{LOGOS_EXECUTABLE}", f"{APPDIR}/")
         
 def install_msi():
+    LOGOS_EXECUTABLE = os.environ.get('LOGOS_EXECUTABLE')
+    WINE_EXE = os.environ.get('WINE_EXE')
+    APPDIR = os.environ.get('APPDIR')
     # Execute the .MSI
     verbose() and print(f"Running: {WINE_EXE} msiexec /i {APPDIR}/{LOGOS_EXECUTABLE}")
     subprocess.run([WINE_EXE, "msiexec", "/i", f"{APPDIR}/{LOGOS_EXECUTABLE}"])
@@ -1198,6 +1223,8 @@ def installD3DCompiler():
         winetricks_dll_install('d3dcompiler_47')
 
 def installLogos9():
+    FLPRODUCT = os.environ.get('FLPRODUCT')
+    WINE_EXE = os.environ.get('WINE_EXE')
     getPremadeWineBottle()
     setWinetricks()
     installFonts()
@@ -1212,6 +1239,8 @@ def installLogos9():
         print("======= {}Bible logging set to Vista mode! =======".format(FLPRODUCT))
 
 def installLogos10():
+    WORKDIR = os.environ.get('WORKDIR')
+    WINETRICKS_UNATTENDED = os.environ.get('WINETRICKS_UNATTENDED')
     with open(os.path.join(WORKDIR, 'disable-winemenubuilder.reg'), 'w') as reg_file, \
             open(os.path.join(WORKDIR, 'renderer_gdi.reg'), 'w') as gdi_file:
         reg_file.write('''REGEDIT4
@@ -1244,6 +1273,11 @@ def installLogos10():
 
 def getScriptTemplate(script_template):
     SCRIPT_TEMPLATE = script_template
+    LAUNCHER_TEMPLATE_URL = os.environ.get('LAUNCHER_TEMPLATE_URL')
+    CONTROL_PANEL_TEMPLATE_URL = os.environ.get('CONTROL_PANEL_TEMPLATE_URL')
+    PRESENT_WORKING_DIRECTORY = os.environ.get('PRESENT_WORKING_DIRECTORY')
+    WORKDIR = os.environ.get('WORKDIR')
+    HOME = os.environ.get('HOME')
     if SCRIPT_TEMPLATE == "Launcher-Template.sh":
         SCRIPT_TEMPLATE_URL = LAUNCHER_TEMPLATE_URL
     else:
@@ -1267,11 +1301,16 @@ def getScriptTemplate(script_template):
         shutil.copy(os.path.join(HOME, 'Downloads', SCRIPT_TEMPLATE), os.path.join(WORKDIR, SCRIPT_TEMPLATE))
 
 def apply_shell_expansion(file):
+    WORKDIR = os.environ.get('WORKDIR')
+    INSTALLDIR = os.environ.get('INSTALLDIR')
+    FLPRODUCT = os.environ.get('FLPRODUCT')
     data = os.system(f"{WORKDIR}/{FLPRODUCT}.sh")
     os.chmod(f"{WORKDIR}/{FLPRODUCT}.sh", 755)
     os.rename(f"{WORKDIR}/{FLPRODUCT}.sh", f"{INSTALLDIR}/")
 
 def createControlPanel():
+    WORKDIR = os.environ.get('WORKDIR')
+    INSTALLDIR = os.environ.get('INSTALLDIR')
     getScriptTemplate("controlPanel-Template.sh")
     with open(f"{WORKDIR}/controlPanel-Template.sh") as template_file:
         template_data = template_file.read()
@@ -1282,12 +1321,14 @@ def createControlPanel():
     os.rename(f"{WORKDIR}/controlPanel.sh", f"{INSTALLDIR}/")
 
 def create_starting_scripts():
+    FLPRODUCT = os.environ.get('FLPRODUCT')
     if verbose:
         print(f"Creating starting scripts for {FLPRODUCT}Bible 64 bits...")
     createLauncher()
     createControlPanel()
 
 def createConfig():
+    HOME = os.environ.get('HOME')
     config_data = '''\
         # INSTALL OPTIONS
         FLPRODUCT="{FLPRODUCT}"
@@ -1318,6 +1359,13 @@ def createConfig():
         config_file.write(config_data)
 
 def postInstall():
+    LOGOS_EXE = os.environ.get('LOGOS_EXE')
+    FLPRODUCT = os.environ.get('FLPRODUCT')
+    TARGETVERSION = os.environ.get('TARGETVERSION')
+    LOGOS_CONFIG = os.environ.get('LOGOS_CONFIG')
+    DEFAULT_CONFIG_PATH = os.environ.get('DEFAULT_CONFIG_PATH')
+    INSTALLDIR = os.environ.get('INSTALLDIR')
+    HOME = os.environ.get('HOME')
     if os.path.isfile(LOGOS_EXE):
         logos_info(f"{FLPRODUCT} Bible {TARGETVERSION} installed!")
         if not LOGOS_CONFIG and not os.path.isfile(DEFAULT_CONFIG_PATH):
@@ -1347,6 +1395,12 @@ def postInstall():
 def main():
     print(f"{os.environ.get('LOGOS_SCRIPT_TITLE')}, {os.environ.get('LOGOS_SCRIPT_VERSION')} by {os.environ.get('LOGOS_SCRIPT_AUTHOR')}.")
     # BEGIN PREPARATION
+    REGENERATE = os.environ.get('REGENERATE')
+    TARGETVERSION = os.environ.get('TARGETVERSION')
+    LOGOS_EXE = os.environ.get('LOGOS_EXE')
+    FLPRODUCT = os.environ.get('FLPRODUCT')
+    WINEPREFIX = os.environ.get('WINEPREFIX')
+    LOGOS_LOG = os.environ.get('LOGOS_LOG')
     if verbose:
         print(datetime.datetime.now())
     checkDependencies()  # We verify the user is running a graphical UI and has majority of required dependencies.
@@ -1361,7 +1415,6 @@ def main():
     chooseInstallMethod()  # We ask user for his desired install method.
     # END PREPARATION
     
-    REGENERATE = os.environ.get('REGENERATE')
     if REGENERATE is None or REGENERATE == "":
         if verbose:
             print(datetime.datetime.now())
@@ -1415,6 +1468,10 @@ if not os.environ.get("DIALOG"):
 
 die_if_running()
 die_if_root()
+
+LOGOS_SCRIPT_TITLE = os.environ.get('LOGOS_SCRIPT_TITLE')
+LOGOS_SCRIPT_VERSION = os.environ.get('LOGOS_SCRIPT_VERSION')
+LOGOS_SCRIPT_AUTHOR = os.environ.get('LOGOS_SCRIPT_AUTHOR')
 
 # BEGIN OPTARGS
 RESET_OPTARGS = True
