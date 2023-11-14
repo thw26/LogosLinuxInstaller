@@ -579,26 +579,32 @@ def wait_process_using_dir(directory):
     verbose()
     print("* End of wait_process_using_dir.")
 
-def make_skel(SET_APPIMAGE_FILENAME):
-    INSTALLDIR = ""
-    APPDIR = ""
-    APPDIR_BINDIR = ""
+def make_skel(app_image_filename):
+    INSTALLDIR = os.environ.get('INSTALLDIR')
+    APPDIR = os.environ.get('APPDIR')
+    APPDIR_BINDIR = os.environ.get('APPDIR_BINDIR')
+    APPIMAGE_LINK_SELECTION_NAME = os.environ.get('APPIMAGE_LINK_SELECTION_NAME')
 
-    SET_APPIMAGE_FILENAME = SET_APPIMAGE_FILENAME
+    SET_APPIMAGE_FILENAME = app_image_filename
 
     verbose()
     print(f"* Making skel64 inside {INSTALLDIR}")
-    subprocess.run(["mkdir", "-p", INSTALLDIR])
-    subprocess.run(["mkdir", APPDIR]) or die(f"can't make dir: {APPDIR}")
-    subprocess.run(["mkdir", APPDIR_BINDIR]) or die(f"can't make dir: {APPDIR_BINDIR}")
+    subprocess.run(["mkdir", "-p", APPDIR_BINDIR]) or die(f"can't make dir: {APPDIR_BINDIR}")
 
     # Making the links
-    subprocess.run(["cd", APPDIR_BINDIR]) or die(f"ERROR: Can't open dir: {APPDIR_BINDIR}")
+    current_dir = os.getcwd()
+    try:
+        os.chdir(APPDIR_BINDIR)
+    except OSError as e:
+        die(f"ERROR: Can't open dir: {APPDIR_BINDIR}: {e}")
     subprocess.run(["ln", "-s", SET_APPIMAGE_FILENAME, f"{APPDIR_BINDIR}/{APPIMAGE_LINK_SELECTION_NAME}"])
-    subprocess.run(["ln", "-s", f"{APPIMAGE_LINK_SELECTION_NAME}", "wine"])
-    subprocess.run(["ln", "-s", f"{APPIMAGE_LINK_SELECTION_NAME}", "wine64"])
-    subprocess.run(["ln", "-s", f"{APPIMAGE_LINK_SELECTION_NAME}", "wineserver"])
-    subprocess.run(["cd", "-"]) or die("ERROR: Can't go back to preview dir!")
+    subprocess.run(["ln", "-s", APPIMAGE_LINK_SELECTION_NAME, "wine"])
+    subprocess.run(["ln", "-s", APPIMAGE_LINK_SELECTION_NAME, "wine64"])
+    subprocess.run(["ln", "-s", APPIMAGE_LINK_SELECTION_NAME, "wineserver"])
+    try:
+        os.chdir(current_dir)
+    except OSError as e:
+        die("ERROR: Can't go back to preview dir!: {e}")
 
     subprocess.run(["mkdir", f"{APPDIR}/wine64_bottle"])
 
@@ -977,7 +983,13 @@ def checkExistingInstall():
 
 def beginInstall():
     SKEL = os.environ.get('SKEL')
+    REGENERATE = os.environ.get('REGENERATE')
     WINEBIN_CODE = os.environ.get('WINEBIN_CODE')
+    FLPRODUCT = os.environ.get('FLPRODUCT')
+    TARGETVERSION = os.environ.get('TARGETVERSION')
+    WINE64_APPIMAGE_FULL_VERSION = os.environ.get('WINE64_APPIMAGE_FULL_VERSION')
+    WINE64_APPIMAGE_FULL_FILENAME = os.environ.get('WINE64_APPIMAGE_FULL_FILENAME')
+    APPDIR_BINDIR = os.environ.get('APPDIR_BINDIR')
     if SKEL == "1":
         if verbose:
             print("Making a skeleton install of the project only. Exiting after completion.")
@@ -1015,7 +1027,7 @@ def beginInstall():
         print(f"Using: {wine_version}")
 
     # Set WINESERVER_EXE based on WINE_EXE.
-    if not WINESERVER_EXE:
+    if not WINESERVER_EXE or WINESERVER_EXE == "":
         wineserver_path = os.path.join(os.path.dirname(WINE_EXE), "wineserver")
         if os.path.exists(wineserver_path):
             WINESERVER_EXE = wineserver_path
