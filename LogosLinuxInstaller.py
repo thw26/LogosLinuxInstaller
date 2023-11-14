@@ -340,7 +340,7 @@ def curses_menu(options, title, question_text):
 
         # Display the wrapped question text, line by line, centered
         question_lines = wrapped_question.split('\n')
-        question_start_y = title_start_y + len(title_lines) + 1
+        question_start_y = title_start_y + len(title_lines) - 4
         question_width = max(len(line) for line in question_lines)
         for i, line in enumerate(question_lines):
             if question_start_y + i < window_height:
@@ -352,14 +352,30 @@ def curses_menu(options, title, question_text):
         for i in range(options_per_page):
             index = current_page * options_per_page + i
             if index < len(options):
-                option = str(options[index])
-                x = window_width // 2 - len(str(option)) // 2
-                y = options_start_y + i
-                if y < window_height:
-                    if index == current_option:
-                        stdscr.addstr(y, x, str(option), curses.A_REVERSE)
-                    else:
-                        stdscr.addstr(y, x, str(option))
+                option = options[index]
+                if type(option) is list:
+                    winebin_code = option[0]
+                    winebin_path = option[1]
+                    winebin_description = option[2]
+                    option_lines = []
+                    winebin_path_wrapped = textwrap.wrap(f"Binary Path: {winebin_path}", window_width - 4)
+                    option_lines.extend(winebin_path_wrapped)
+                    winebin_desc_wrapped = textwrap.wrap(f"Description: {winebin_description}", window_width - 4)
+                    option_lines.extend(winebin_desc_wrapped)
+                else:
+                    option_lines = textwrap.wrap(option, window_width - 4)
+
+                for j, line in enumerate(option_lines):
+                    y = options_start_y + i + j
+                    x = max(0, window_width // 2 - len(line) // 2)
+                    if y < window_height:
+                        if index == current_option:
+                            stdscr.addstr(y, x, line, curses.A_REVERSE)
+                        else:
+                            stdscr.addstr(y, x, line)
+
+                if type(option) is list:
+                    options_start_y += (len(option_lines))
 
         # Display pagination information
         page_info = f"Page {current_page + 1}/{total_pages} | Selected Option: {current_option + 1}/{len(options)}"
@@ -892,16 +908,16 @@ def chooseInstallMethod():
             # Set binary code, description, and path based on path
             if "/usr/bin/" in binary:
                 WINEBIN_CODE = "System"
-                WINEBIN_DESCRIPTION = "\"Use the system binary (i.e., /usr/bin/wine64). WINE must be 7.18-staging or later. Stable or Devel do not work.\""
+                WINEBIN_DESCRIPTION = "Use the system binary (i.e., /usr/bin/wine64). WINE must be 7.18-staging or later. Stable or Devel do not work."
             elif "Proton" in binary:
                 WINEBIN_CODE = "Proton"
-                WINEBIN_DESCRIPTION = "\"Install using the Steam Proton fork of WINE.\""
+                WINEBIN_DESCRIPTION = "Install using the Steam Proton fork of WINE."
             elif "PlayOnLinux" in binary:
                 WINEBIN_CODE = "PlayOnLinux"
-                WINEBIN_DESCRIPTION = "\"Install using a PlayOnLinux WINE64 binary.\""
+                WINEBIN_DESCRIPTION = "Install using a PlayOnLinux WINE64 binary."
             else:
                 WINEBIN_CODE = "Custom"
-                WINEBIN_DESCRIPTION = "\"Use a WINE64 binary from another directory.\""
+                WINEBIN_DESCRIPTION = "Use a WINE64 binary from another directory."
 
             # Create wine binary option array
             if os.environ.get('DIALOG') in ["whiptail", "dialog", "curses"]:
