@@ -13,6 +13,11 @@ import textwrap
 import requests
 from xml.etree import ElementTree as ET
 
+#TODO: Redo all GUI commands
+#TODO: Redo logos_progress
+#TODO: Fix assigning of WINESERVER_EXE
+#TODO: Make optarg to add custom path to the wine binary paths.
+
 # Environment variables
 os.environ["LOGOS_SCRIPT_TITLE"] = "Logos Linux Installer"
 os.environ["LOGOS_SCRIPT_AUTHOR"] = "Ferion11, John Goodman, T. H. Wright"
@@ -175,18 +180,6 @@ def clean_all():
     os.system("rm -fr {WORKDIR}")
     logos_info("done")
 
-def light_wineserver_wait():
-    WINE_EXE = os.environ.get('WINESERVER_EXE')
-    WINESERVER_EXE = os.environ.get('WINESERVER_EXE')
-    os.system(f"{WINESERVER_EXE} -w | logos_progress 'Waiting for {WINE_EXE} to end properly…' 'Waiting for {WINE_EXE} to end properly…'")
-
-def heavy_wineserver_wait():
-    WINE_EXE = os.environ.get('WINESERVER_EXE')
-    WINESERVER_EXE = os.environ.get('WINESERVER_EXE')
-    WINEPREFIX = os.environ.get('WINEPREFIX')
-    wait_process_using_dir(WINEPREFIX) | logos_progress("Waiting for {WINE_EXE} to end properly…", "Waiting for {WINE_EXE} to end properly…")
-    os.system(f"{WINESERVER_EXE} -w | logos_progress 'Waiting for {WINE_EXE} proper end' 'Waiting for {WINE_EXE} to end properly…'")
-
 def mkdir_critical(directory):
     try:
         os.mkdir(directory)
@@ -206,7 +199,7 @@ def cli_msg(message):
 def gtk_info(*args):
     subprocess.Popen(["zenity", "--info", "--width=300", "--height=200", "--text=" + " ".join(args), "--title=Information"])
     
-def gtk_progress(title, text):
+def gtk_progress(pipe, title, text):
     subprocess.Popen(["zenity", "--progress", "--title=" + title, "--text=" + text, "--pulsate", "--auto-close", "--no-cancel"])
     
 def gtk_warn(*args):
@@ -226,12 +219,12 @@ def logos_info(message):
     elif DIALOG == "kdialog":
         pass
 
-def logos_progress(title, text):
+def logos_progress(pipe, title, text):
     DIALOG = os.environ.get("DIALOG")
     if os.environ.get('DIALOG') in ['whiptail', 'dialog', 'curses']:
         cli_msg(text)
     elif DIALOG == "zenity":
-        gtk_progress(title, text)
+        gtk_progress(pipe, title, text)
     elif DIALOG == "kdialog":
         pass
     
@@ -544,14 +537,14 @@ def logos_reuse_download(SOURCEURL, FILE, TARGETDIR):
         if os.path.isfile(os.path.join(i, FILE)):
             logos_info(f"{FILE} exists in {i}. Using it…")
             shutil.copy(os.path.join(i, FILE), TARGETDIR)
-            logos_progress("Copying…", f"Copying {FILE}\ninto {TARGETDIR}")
+            logos_progress("", "Copying…", f"Copying {FILE}\ninto {TARGETDIR}")
             FOUND = 0
             break
     if FOUND == 1:
         logos_info(f"{FILE} does not exist. Downloading…")
         logos_download(SOURCEURL, os.path.join(DOWNLOADS, FILE))
         shutil.copy(os.path.join(DOWNLOADS, FILE), TARGETDIR)
-        logos_progress("Copying…", f"Copying: {FILE}\ninto: {TARGETDIR}")
+        logos_progress("", "Copying…", f"Copying: {FILE}\ninto: {TARGETDIR}")
 
 def getAppImage():
     WINE64_APPIMAGE_FULL_URL = os.environ.get('WINE64_APPIMAGE_FULL_URL')
@@ -589,6 +582,26 @@ def wait_process_using_dir(directory):
             break
     verbose()
     print("* End of wait_process_using_dir.")
+
+def light_wineserver_wait():
+    WINE_EXE = os.environ.get('WINESERVER_EXE')
+    WINESERVER_EXE = os.environ.get('WINESERVER_EXE')
+    command = [f"{WINESERVER_EXE}", "-w"]
+    try:
+        result = subprocess.run(command, stdout=subprocess.PIPE, text=True)
+        logos_progress(result.stdout, f"Waiting for {WINE_EXE} to end properly…", f"Waiting for {WINE_EXE} to end properly…")
+    except subprocess.CalledProcessError as e:
+        print(f"Error: {e}")
+
+def heavy_wineserver_wait():
+    WINE_EXE = os.environ.get('WINESERVER_EXE')
+    WINESERVER_EXE = os.environ.get('WINESERVER_EXE')
+    WINEPREFIX = os.environ.get('WINEPREFIX')
+    result = wait_process_using_dir(WINEPREFIX)
+    logos_progress(result.stdout, f"Waiting for {WINE_EXE} to end properly…", f"Waiting for {WINE_EXE} to end properly…")
+    command = [f"{WINESERVER_EXE}", "-w"]
+    result = subprocess.run(command, stdout=subprocess.PIPE, text=true)
+    logos_progress(result.stdout, f"Waiting for {WINE_EXE} to end properly…", f"Waiting for {WINE_EXE} to end properly…")
 
 def make_skel(app_image_filename):
     INSTALLDIR = os.environ.get('INSTALLDIR')
@@ -868,7 +881,6 @@ def wineBinaryVersionCheck(TESTBINARY):
 
 def createWineBinaryList():
     logos_info("Creating binary list.")
-    # TODO: Make optarg to add custom path to this list.
     CUSTOMBINPATH = os.environ.get("CUSTOMBINPATH", "")
 
     WineBinPathList = [
@@ -1126,7 +1138,7 @@ def winetricks_install(*args):
         os.mkfifo(pipe_winetricks)
 
         # zenity GUI feedback
-        logos_progress("Winetricks " + " ".join(args), "Winetricks installing " + " ".join(args), input=open(pipe_winetricks))
+        logos_progress("", "Winetricks " + " ".join(args), "Winetricks installing " + " ".join(args), input=open(pipe_winetricks))
 
         proc = subprocess.Popen([WINETRICKSBIN, *args], stdout=subprocess.PIPE)
         with open(pipe_winetricks, "w") as pipe:
@@ -1172,7 +1184,7 @@ def getPremadeWineBottle():
     verbose and print("Installing pre-made wineBottle 64bits…")
     logos_reuse_download(WINE64_BOTTLE_TARGZ_URL, WINE64_BOTTLE_TARGZ_NAME, WORKDIR)
     subprocess.call(["tar", "xzf", os.path.join(WORKDIR, WINE64_BOTTLE_TARGZ_NAME), "-C", APPDIR])
-    logos_progress("Extracting…", "Extracting: " + WINE64_BOTTLE_TARGZ_NAME + "\ninto: " + APPDIR)
+    logos_progress("", "Extracting…", "Extracting: " + WINE64_BOTTLE_TARGZ_NAME + "\ninto: " + APPDIR)
 
 ## END WINE BOTTLE AND WINETRICKS FUNCTIONS
 ## BEGIN LOGOS INSTALL FUNCTIONS
