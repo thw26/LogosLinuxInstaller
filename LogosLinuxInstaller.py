@@ -956,6 +956,7 @@ def chooseInstallMethod():
 
 def checkExistingInstall():
     # Now that we know what the user wants to install and where, determine whether an install exists and whether to continue.
+    INSTALLDIR = os.environ.get('INSTALLDIR')
     if os.path.isdir(INSTALLDIR):
         if any(os.path.isfile(os.path.join(INSTALLDIR, file)) for file in ['Logos.exe', 'Verbum.exe']):
             global EXISTING_LOGOS_INSTALL
@@ -1342,7 +1343,8 @@ def main():
     chooseInstallMethod()  # We ask user for his desired install method.
     # END PREPARATION
     
-    if not REGENERATE:
+    REGENERATE = os.environ.get('REGENERATE')
+    if REGENERATE is None or REGENERATE == "":
         if verbose:
             print(datetime.datetime.now())
         checkExistingInstall()
