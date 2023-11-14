@@ -348,21 +348,14 @@ def curses_menu(options, title, question_text):
 
         # Display the options, centered
         options_start_y = question_start_y + len(question_lines) + 2
-        window = curses.newwin(window_height, window_width, options_start_y, 2)
         for i, option in enumerate(options):
-            if i == current_option:
-                window.addstr(i, 0, option, curses.A_REVERSE)
-            else:
-                window.addstr(i, 0, option)
-
-        #for i, option in enumerate(options):
-        #    x = window_width // 2 - len(option) // 2
-        #    y = options_start_y + i
-        #    if y < window_height:
-        #        if i == current_option:
-        #            stdscr.addstr(y, x, option, curses.A_REVERSE)
-        #        else:
-        #            stdscr.addstr(y, x, option)
+            x = window_width // 2 - len(option) // 2
+            y = options_start_y + i
+            if y < window_height:
+                if i == current_option:
+                    stdscr.addstr(y, x, option, curses.A_REVERSE)
+                else:
+                    stdscr.addstr(y, x, option)
 
         # Refresh the windows
         stdscr.refresh()
@@ -370,24 +363,13 @@ def curses_menu(options, title, question_text):
         # Get user input
         key = stdscr.getch()
 
-        while key == 27:  # Check for escape sequences
-            next_key = stdscr.getch()
-            if next_key == -1:  # No more characters in the buffer
-                break
-            elif next_key == 91:  # Check for '[' (indicating arrow key)
-                arrow_key = stdscr.getch()
-                if arrow_key == 65:  # Up arrow key
-                    key = curses.KEY_UP
-                    current_option = max(0, current_option-1)
-                elif arrow_key == 66:  # Down arrow key
-                    key = curses.KEY_DOWN
-                    current_option = min(len(options)-1, current_option+1)
-
-        if key == 10: # Enter key
+        if key == 65:
+            current_option = max(0, current_option-1)
+        elif key == 66:
+            current_option = min(len(options)-1, current_option+1)
+        elif key == ord('\n'): # Enter key
             choice = options[current_option]
             break
-        else:
-            key = next_key
 
     curses.endwin()
     return choice
