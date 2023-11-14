@@ -1091,13 +1091,27 @@ def prepareWineBottle():
         f"Now the script will create and configure the Wine Bottle at {WINEPREFIX}. You can cancel the installation of Mono. Do you wish to continue?", f"The installation was cancelled!", "")
     
     env = os.environ.copy()
+    env['DISPLAY'] = ''
     command = [WINE_EXE, "wineboot"]
+    if WINEPREFIX:
+        env_command = [f"WINEPREFIX={WINEPREFIX}"]
+        full_command = env_command + command
+    else:
+        full_command = command
 
-    process = subprocess.Popen(command, env=env, shell=True)
-    while process.poll() is None:
-        logos_progress("Waiting…", f"Waiting on {command}…")
-    if process.returncode != 0:
-        print(f"Error: {result.stdout}")
+    try:
+        print(f"Running: {full_command}")
+        process = subprocess.run(full_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True, shell=True)
+
+        if process.returncode != 0:
+            print (f"Error 1 running wineboot: {return_code}")
+        else:
+            print(f"Finished running wineboot.")
+            print("stdout:", process.stdout)
+            print("stderr:", process.stderr)
+
+    except subprocess.CalledProcessError as e:
+        print (f"Error 2 running wineboot: {e}")
 
     light_wineserver_wait()
 
