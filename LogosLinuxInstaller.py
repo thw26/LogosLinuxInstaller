@@ -46,6 +46,7 @@ os.environ.setdefault("DEBUG", "FALSE")
 os.environ.setdefault("VERBOSE", "FALSE")
 
 def usage():
+    PDIF = '/tmp/LogosLinuxInstaller.pid'
     with open(PIDF, 'r') as file:
         print(file.read())
 
@@ -68,13 +69,13 @@ def die_if_running():
 
 def die_if_root():
     if os.getuid() == 0 and not LOGOS_FORCE_ROOT:
-        logos_error("Running Wine/winetricks as root is highly discouraged. Use -f|--force-root if you must run as root. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F")
+        logos_error("Running Wine/winetricks as root is highly discouraged. Use -f|--force-root if you must run as root. See https://wiki.winehq.org/FAQ#Should_I_run_Wine_as_root.3F", "")
 
 def verbose():
-    return os.environ["VERBOSE"]
+    return os.environ.get("VERBOSE")
 
 def debug():
-    return DEBUG
+    return os.environ.get('DEBUG')
 
 def setDebug():
     global DEBUG, VERBOSE, WINEDEBUG
@@ -107,7 +108,7 @@ def getDialog():
     global DIALOG, GUI
 
     if not os.environ.get('DISPLAY'):
-        logos_error("The installer does not work unless you are running a display")
+        logos_error("The installer does not work unless you are running a display", "")
         sys.exit(1)
 
     DIALOG = ""
@@ -175,9 +176,14 @@ def clean_all():
     logos_info("done")
 
 def light_wineserver_wait():
+    WINE_EXE = os.environ.get('WINESERVER_EXE')
+    WINESERVER_EXE = os.environ.get('WINESERVER_EXE')
     os.system(f"{WINESERVER_EXE} -w | logos_progress 'Waiting for {WINE_EXE} to end properly…' 'Waiting for {WINE_EXE} to end properly…'")
 
 def heavy_wineserver_wait():
+    WINE_EXE = os.environ.get('WINESERVER_EXE')
+    WINESERVER_EXE = os.environ.get('WINESERVER_EXE')
+    WINEPREFIX = os.environ.get('WINEPREFIX')
     wait_process_using_dir(WINEPREFIX) | logos_progress("Waiting for {WINE_EXE} to end properly…", "Waiting for {WINE_EXE} to end properly…")
     os.system(f"{WINESERVER_EXE} -w | logos_progress 'Waiting for {WINE_EXE} proper end' 'Waiting for {WINE_EXE} to end properly…'")
 
@@ -185,9 +191,10 @@ def mkdir_critical(directory):
     try:
         os.mkdir(directory)
     except OSError:
-        logos_error(f"Can't create the {directory} directory")
+        logos_error(f"Can't create the {directory} directory", "")
 
 def no_diag_msg(message):
+    LOGOS_LOG = os.environ.get('LOGOS_LOG')
     with open(LOGOS_LOG, "a") as file:
         file.write(message + "\n")
     subprocess.Popen(["xterm", "-hold", "-e", "printf", "%s" % message])
@@ -628,7 +635,7 @@ def check_commands(*cmds):
             MISSING_CMD.append(cmd)
     
     if len(MISSING_CMD) != 0:
-        logos_error(f"Your system is missing {' '.join(MISSING_CMD)}. Please install your distro's {' '.join(MISSING_CMD)} package(s).\n {EXTRA_INFO}")
+        logos_error(f"Your system is missing {' '.join(MISSING_CMD)}. Please install your distro's {' '.join(MISSING_CMD)} package(s).\n {EXTRA_INFO}", "")
 
 def have_lib(lib):
     try:
@@ -778,7 +785,7 @@ def chooseVersion():
     elif versionChoice == "Exit.":
         exit()
     else:
-        logos_error("Unknown version. Installation canceled!")
+        logos_error("Unknown version. Installation canceled!", "")
 
     getLogosReleaseVersion(TARGETVERSION)
 
@@ -796,7 +803,7 @@ def chooseVersion():
     elif os.environ.get('FLPRODUCT') == "Verbum":
         LOGOS_VERSION = LOGOS64_URL.split('/')[6]
     else:
-        logos_error("FLPRODUCT not set in config. Please update your config to specify either 'Logos' or 'Verbum'.")
+        logos_error("FLPRODUCT not set in config. Please update your config to specify either 'Logos' or 'Verbum'.", "")
     os.environ['LOGOS_VERSION'] = LOGOS_VERSION
 
     LOGOS64_MSI = os.path.basename(LOGOS64_URL)
@@ -1045,10 +1052,12 @@ def prepareWineBottle():
     WINEBOOT_GUI = os.environ.get('WINEBOOT_GUI')
     logos_continue_question(
         f"Now the script will create and configure the Wine Bottle at {WINEPREFIX}. You can cancel the installation of Mono. Do you wish to continue?", f"The installation was cancelled!", "")
+    env = os.environ.copy()
+    env["DISPLAY"] = ""
     if not WINEBOOT_GUI:
-        subprocess.Popen(["DISPLAY=","wineboot"], stdout=subprocess.PIPE).communicate()
+        subprocess.Popen(["wineboot"], stdout=subprocess.PIPE, env=env).communicate()
     else:
-        subprocess.Popen(["wineboot"], stdout=subprocess.PIPE).communicate()
+        subprocess.Popen(["wineboot"], stdout=subprocess.PIPE, env=env).communicate()
     light_wineserver_wait()
 
 def wine_reg_install(REG_FILENAME):
@@ -1134,10 +1143,10 @@ def winetricks_install(*args):
         if ZENITY_RETURN == 0 or ZENITY_RETURN == 127:
             if WINETRICKS_STATUS != 0:
                 subprocess.call([WINESERVER_EXE, "-k"])
-                logos_error("Winetricks Install ERROR: The installation was cancelled because of sub-job failure!\n * winetricks " + " ".join(args) + "\n  - WINETRICKS_STATUS: " + str(WINETRICKS_STATUS))
+                logos_error("Winetricks Install ERROR: The installation was cancelled because of sub-job failure!\n * winetricks " + " ".join(args) + "\n  - WINETRICKS_STATUS: " + str(WINETRICKS_STATUS), "")
         else:
             subprocess.call([WINESERVER_EXE, "-k"])
-            logos_error("The installation was cancelled!\n * ZENITY_RETURN: " + str(ZENITY_RETURN))
+            logos_error("The installation was cancelled!\n * ZENITY_RETURN: " + str(ZENITY_RETURN), "")
     elif DIALOG == "kdialog":
         no_diag_msg("kdialog not implemented.")
     else:
@@ -1390,7 +1399,7 @@ def postInstall():
         elif verbose:
             print("The script has finished. Exiting…")
     else:
-        logos_error("Installation failed. {LOGOS_EXE} not found. Exiting…\nThe {FLPRODUCT} executable was not found. This means something went wrong while installing {FLPRODUCT}. Please contact the Logos on Linux community for help.")
+        logos_error("Installation failed. {LOGOS_EXE} not found. Exiting…\nThe {FLPRODUCT} executable was not found. This means something went wrong while installing {FLPRODUCT}. Please contact the Logos on Linux community for help.", "")
 
 def main():
     print(f"{os.environ.get('LOGOS_SCRIPT_TITLE')}, {os.environ.get('LOGOS_SCRIPT_VERSION')} by {os.environ.get('LOGOS_SCRIPT_AUTHOR')}.")
@@ -1426,16 +1435,16 @@ def main():
             print(datetime.datetime.now())
         prepareWineBottle()  # We run wineboot.
         
-        if TARGETVERSION.startswith("10"):
+        if TARGETVERSION == "10":
             if verbose:
                 print(datetime.datetime.now())
             installLogos10()  # We run the commands specific to Logos 10.
-        elif TARGETVERSION.startswith("9"):
+        elif TARGETVERSION == "9":
             if verbose:
                 print(datetime.datetime.now())
             installLogos9()  # We run the commands specific to Logos 9.
         else:
-            logos_error("Installation canceled!")
+            logos_error("Installation canceled!", "")
         
         if verbose:
             print(datetime.datetime.now())
