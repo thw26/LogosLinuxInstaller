@@ -39,6 +39,7 @@ os.environ.setdefault("DEFAULT_CONFIG_PATH", os.path.expanduser("~/.config/Logos
 os.environ.setdefault("LOGOS_LOG", os.path.expanduser("~/.local/state/Logos_on_Linux/install.log"))
 os.makedirs(os.path.dirname(os.environ["LOGOS_LOG"]), exist_ok=True)
 open(os.environ["LOGOS_LOG"], "a").close()
+LOGOS_LOG = os.environ["LOGOS_LOG"]
 os.environ.setdefault("WINEDEBUG", "fixme-all,err-all")
 os.environ.setdefault("DEBUG", "FALSE")
 os.environ.setdefault("VERBOSE", "FALSE")
@@ -94,7 +95,16 @@ def t(command):
     except subprocess.CalledProcessError:
         return False
 
+def tl(library):
+    try:
+        __import__(library)
+        return True
+    except ImportError:
+        return False
+
 def getDialog():
+    global DIALOG, GUI
+
     if not os.environ.get('DISPLAY'):
         logos_error("The installer does not work unless you are running a display")
         sys.exit(1)
@@ -103,13 +113,15 @@ def getDialog():
     DIALOG_ESCAPE = ""
     GUI = ""
 
-    if os.isatty(0):
-        if t("whiptail"):
-            DIALOG = "whiptail"
-        elif t("dialog"):
-            DIALOG = "dialog"
-            DIALOG_ESCAPE = "--"
-            os.environ['DIALOG_ESCAPE'] = DIALOG_ESCAPE
+    if sys.__stdin__.isatty():
+        if tl("curses"):
+            DIALOG = "curses"
+            GUI = False
+            # DIALOG = "whiptail"
+            # elif t("dialog"):
+            # DIALOG = "dialog"
+            # DIALOG_ESCAPE = "--"
+            # os.environ['DIALOG_ESCAPE'] = DIALOG_ESCAPE
         else:
             if os.environ.get('XDG_CURRENT_DESKTOP') != "KDE":
                 if t("zenity"):
@@ -145,7 +157,8 @@ def getDialog():
             sys.exit(1)
 
     os.environ['DIALOG'] = DIALOG
-    os.environ['GUI'] = GUI
+    os.environ['GUI'] = str(GUI)
+    print("DIALOG = " + DIALOG)
 
 def have_dep(cmd):
     try:
@@ -195,7 +208,8 @@ def gtk_error(*args):
     subprocess.Popen(["zenity", "--error", "--width=300", "--height=200", "--text=" + " ".join(args), "--title=Error!"])   
 
 def logos_info(message):
-    if DIALOG in ["whiptail", "dialog"]:
+    DIALOG = os.environ.get("DIALOG")
+    if os.environ.get('DIALOG') in ['whiptail', 'dialog', 'curses']:
         cli_msg(message)
     elif DIALOG == "zenity":
         gtk_info(message)
@@ -205,7 +219,8 @@ def logos_info(message):
         pass
 
 def logos_progress(title, text):
-    if DIALOG in ["whiptail", "dialog"]:
+    DIALOG = os.environ.get("DIALOG")
+    if os.environ.get('DIALOG') in ['whiptail', 'dialog', 'curses']:
         cli_msg(text)
     elif DIALOG == "zenity":
         gtk_progress(title, text)
@@ -213,7 +228,8 @@ def logos_progress(title, text):
         pass
     
 def logos_warn(message):
-    if DIALOG in ["whiptail", "dialog"]:
+    DIALOG = os.environ.get("DIALOG")
+    if os.environ.get('DIALOG') in ['whiptail', 'dialog', 'curses']:
         cli_msg(message)
     elif DIALOG == "zenity":
         gtk_warn(message)
@@ -223,12 +239,13 @@ def logos_warn(message):
         pass
 
 def logos_error(message, secondary):
+    DIALOG = os.environ.get("DIALOG")
     WIKI_LINK = "https://github.com/ferion11/LogosLinuxInstaller/wiki"
     TELEGRAM_LINK = "https://t.me/linux_logos"
     MATRIX_LINK = "https://matrix.to/#/#logosbible:matrix.org"
     help_message = f"If you need help, please consult:\n{WIKI_LINK}\n{TELEGRAM_LINK}\n{MATRIX_LINK}"
     DIALOG = os.environ.get('DIALOG')
-    if DIALOG in ["whiptail", "dialog"]:
+    if os.environ.get('DIALOG') in ['whiptail', 'dialog', 'curses']:
         cli_msg(message + "\n" + help_message)
     elif DIALOG == "zenity":
         gtk_error(message + "\n" + help_message)
@@ -277,7 +294,7 @@ def gtk_acknowledge_question(QUESTION_TEXT, NO_TEXT):
         logos_info(NO_TEXT)
         
 def logos_continue_question(QUESTION_TEXT, NO_TEXT, SECONDARY):
-    if os.environ.get('DIALOG') == 'whiptail' or os.environ.get('DIALOG') == 'dialog':
+    if os.environ.get('DIALOG') in ['whiptail', 'dialog', 'curses']:
         cli_continue_question(QUESTION_TEXT, NO_TEXT, SECONDARY)
     elif os.environ.get('DIALOG') == 'zenity':
         gtk_continue_question(QUESTION_TEXT, NO_TEXT, SECONDARY)
@@ -285,12 +302,57 @@ def logos_continue_question(QUESTION_TEXT, NO_TEXT, SECONDARY):
         pass
         
 def logos_acknowledge_question(QUESTION_TEXT, NO_TEXT):
-    if os.environ.get('DIALOG') == 'whiptail' or os.environ.get('DIALOG') == 'dialog':
+    if os.environ.get('DIALOG') in ['whiptail', 'dialog', 'curses']:
         cli_acknowledge_question(QUESTION_TEXT, NO_TEXT)
     elif os.environ.get('DIALOG') == 'zenity':
         gtk_acknowledge_question(QUESTION_TEXT, NO_TEXT)
     elif os.environ.get('DIALOG') == 'kdialog':
         pass
+
+def curses_menu(options, title, question_text):
+    # Set up the screen
+    stdscr = curses.initscr()
+    curses.curs_set(0)
+    stdscr.nodelay(1)
+    stdscr.timeout(100)
+
+    # Define the options for the radio list
+    current_option = 0
+
+    while True:
+        stdscr.clear()
+        height, width = stdscr.getmaxyx()
+
+        # Display the title text
+        stdscr.addstr(1, 2, title, curses.A_BOLD)
+        # Display the question text
+        stdscr.addstr(height//2 - len(options)//2 - 2, width//2 - len(question_text)//2, question_text)
+
+        # Display the radio list options
+        for i, option in enumerate(options):
+            x = width//2 - len(option)//2
+            y = height//2 - len(options)//2 + i
+            if i == current_option:
+                stdscr.attron(curses.A_REVERSE)
+                stdscr.addstr(y, x, option)
+                stdscr.attroff(curses.A_REVERSE)
+            else:
+                stdscr.addstr(y, x, option)
+
+        # Get user input
+        key = stdscr.getch()
+
+        # Process user input
+        if key == curses.KEY_UP:
+            current_option = max(0, current_option-1)
+        elif key == curses.KEY_DOWN:
+            current_option = min(len(options)-1, current_option+1)
+        elif key == ord('\n'):  # User presses Enter
+            choice = options[current_option]
+            break
+
+    curses.endwin()
+    return choice
 
 def cli_download(uri, destination):
     filename = os.path.basename(uri)
@@ -390,7 +452,7 @@ def gtk_download(uri, destination):
     print(f"{filename} download finished!")
 
 def logos_download(uri, destination):
-    if os.environ.get('DIALOG') == 'whiptail' or os.environ.get('DIALOG') == 'dialog':
+    if os.environ.get('DIALOG') in ['whiptail', 'dialog', 'curses']:
         cli_download(uri, destination)
     elif os.environ.get('DIALOG') == 'zenity':
         gtk_download(uri, destination)
@@ -531,44 +593,9 @@ def chooseProduct():
     QUESTION_TEXT = "Choose which FaithLife product the script should install:"
     if not os.environ.get("FLPRODUCT"):
         DIALOG = os.environ.get("DIALOG")
-        if DIALOG in ["whiptail", "dialog"]:
-            # Set up the screen
-            stdscr = curses.initscr()
-            curses.curs_set(0)
-            stdscr.nodelay(1)
-            stdscr.timeout(100)
-        
-            # Define the options for the radio list
+        if os.environ.get('DIALOG') in ['whiptail', 'dialog', 'curses']:
             options = ["Logos", "Verbum", "Exit"]
-            current_option = 0
-        
-            while True:
-                stdscr.clear()
-                height, width = stdscr.getmaxyx()
-        
-                # Display the radio list options
-                for i, option in enumerate(options):
-                    x = width//2 - len(option)//2
-                    y = height//2 - len(options)//2 + i
-                    if i == current_option:
-                        stdscr.attron(curses.A_REVERSE)
-                        stdscr.addstr(y, x, option)
-                        stdscr.attroff(curses.A_REVERSE)
-                    else:
-                        stdscr.addstr(y, x, option)
-        
-                # Get user input
-                key = stdscr.getch()
-
-                # Process user input
-                if key == curses.KEY_UP:
-                    current_option = max(0, current_option-1)
-                elif key == curses.KEY_DOWN:
-                    current_option = min(len(options)-1, current_option+1)
-                elif key == ord('\n'):  # User presses Enter
-                    productChoice = options[current_option]
-                    break
-            curses.endwin()
+            productChoice = curses_menu(options, TITLE, QUESTION_TEXT)
         elif DIALOG == "zenity":
             process = subprocess.Popen(["zenity", "--width=700", "--height=310", "--title=" + TITLE, "--text=" + QUESTION_TEXT, "--list", "--radiolist", "--column", "S", "--column", "Description", "TRUE", "Logos Bible Software.", "FALSE", "Verbum Bible Software.", "FALSE", "Exit."], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             productChoice, _ = process.communicate()
@@ -600,52 +627,52 @@ def chooseProduct():
     if not os.environ.get("LOGOS_ICON_URL"):
         os.environ["LOGOS_ICON_URL"] = "https://raw.githubusercontent.com/ferion11/LogosLinuxInstaller/master/img/" + os.environ.get("FLPRODUCTi") + "-128-icon.png"
 
+def getLogosReleaseVersion(TARGETVERSION):
+    url = f"https://clientservices.logos.com/update/v1/feed/logos{TARGETVERSION}/stable.xml"
+
+    try:
+        # Fetch XML content using requests
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an exception for bad responses
+
+        # Parse XML
+        root = ET.fromstring(response.text)
+        xmldata = ET.tostring(root, encoding="utf-8", method="xml").decode("utf-8")
+
+        # Define the pattern to find the version string
+        pattern = re.compile(r'version="([\d.]+)"')
+
+        # Search for the pattern in the XML data
+        match = pattern.search(xmldata)
+
+        # Check if a match is found
+        if match:
+            logos_release_version = match.group(1)
+        else:
+            print("Version not found")
+
+    except requests.RequestException as e:
+        print(f"Error fetching or parsing XML: {e}")
+        return None
+
+    if logos_release_version is not None:
+        global LOGOS_RELEASE_VERSION
+        LOGOS_RELEASE_VERSION = logos_release_version
+        os.environ["LOGOS_RELEASE_VERSION"] = logos_release_version
+    else:
+        print("Failed to fetch LOGOS_RELEASE_VERSION.")
+
 def chooseVersion():
+    global TARGETVERSION
     TARGETVERSION = os.environ.get('TARGETVERSION')
     DIALOG = os.environ.get('DIALOG')
     BACKTITLE = "Choose Version Menu"
     TITLE = "Choose Product Version"
     QUESTION_TEXT = f"Which version of {os.environ.get('FLPRODUCT')} should the script install?"
     if TARGETVERSION is None or TARGETVERSION == "":
-        if DIALOG == "whiptail" or DIALOG == "dialog":
-            if DIALOG in ["whiptail", "dialog"]:
-                # Set up the screen
-                stdscr = curses.initscr()
-                curses.curs_set(0)
-                stdscr.nodelay(1)
-                stdscr.timeout(100)
-        
-                # Define the options for the radio list
-                options = ["10", "9", "Exit"]
-                current_option = 0
-        
-                while True:
-                    stdscr.clear()
-                    height, width = stdscr.getmaxyx()
-        
-                    # Display the radio list options
-                    for i, option in enumerate(options):
-                        x = width//2 - len(option)//2
-                        y = height//2 - len(options)//2 + i
-                        if i == current_option:
-                            stdscr.attron(curses.A_REVERSE)
-                            stdscr.addstr(y, x, option)
-                            stdscr.attroff(curses.A_REVERSE)
-                        else:
-                            stdscr.addstr(y, x, option)
-        
-                    # Get user input
-                    key = stdscr.getch()
-        
-                    # Process user input
-                    if key == curses.KEY_UP:
-                        current_option = max(0, current_option-1)
-                    elif key == curses.KEY_DOWN:
-                        current_option = min(len(options)-1, current_option+1)
-                    elif key == ord('\n'):  # User presses Enter
-                        versionChoice = options[current_option]
-                        break
-                curses.endwin()
+        if os.environ.get('DIALOG') in ["whiptail", "dialog", "curses"]:
+            options = ["10", "9", "Exit"]
+            versionChoice = curses_menu(options, TITLE, QUESTION_TEXT)
         elif DIALOG == "zenity":
             command = ["zenity", "--width=700", "--height=310", "--title", TITLE, "--text", QUESTION_TEXT, "--list", "--radiolist", "--column", "S", "--column", "Description", "TRUE", f"{FLPRODUCT} 10", "FALSE", f"{FLPRODUCT} 9", "FALSE", "Exit"]
             versionChoice = subprocess.check_output(command, stderr=subprocess.STDOUT).decode().strip()
@@ -667,33 +694,21 @@ def chooseVersion():
     else:
         logos_error("Unknown version. Installation canceled!")
 
-    url = f"https://clientservices.logos.com/update/v1/feed/logos{TARGETVERSION}/stable.xml"
-    response = requests.get(url)
-    if response.ok:
-        xml_data = response.text
-    else:
-        logos_error(f"Failed to get Logos XML feed. Request failed with status code: {response.status_code}")
-    root = ET.fromstring(xml_data)
-    entries = root.findall('{http://www.w3.org/2005/Atom}entry')
-    first_entry = entries[0]
-    version_element = first_entry.find('version')
-    minimum_os_version_element = first_entry.find('minimum-os-version')
-    LOGOS_RELEASE_VERSION=""
-    if version_element is not None:
-        LOGOS_RELEASE_VERSION = version_element.text.strip()
-    if minimum_os_version_element is not None:
-        minimum_os_version_element = minimum_os_version_element.text.strip()
-    os.environ["LOGOS_RELEASE_VERSION"] = LOGOS_RELEASE_VERSION
+    getLogosReleaseVersion(TARGETVERSION)
+
+    global LOGOS_RELEASE_VERSION
 
     LOGOS64_URL=""
     if LOGOS64_URL is None or LOGOS64_URL == "":
-        LOGOS64_URL = f"https://downloads.logoscdn.com/LBS{TARGETVERSION}{os.environ.get('VERBUM_PATH')}Installer/{LOGOS_RELEASE_VERSION}/{os.environ.get('FLPRODUCT')}-x64.msi"
+        LOGOS64_URL = f"https://downloads.logoscdn.com/LBS{TARGETVERSION}{os.environ.get('VERBUM_PATH')}Installer/{os.environ.get('LOGOS_RELEASE_VERSION')}/{os.environ.get('FLPRODUCT')}-x64.msi"
         os.environ['LOGOS64_URL'] = LOGOS64_URL
 
+    global LOGOS_VERSION
+
     if os.environ.get('FLPRODUCT') == "Logos":
-        LOGOS_VERSION = LOGOS64_URL.split('/')[6]
+        LOGOS_VERSION = LOGOS64_URL.split('/')[5]
     elif os.environ.get('FLPRODUCT') == "Verbum":
-        LOGOS_VERSION = LOGOS64_URL.split('/')[7]
+        LOGOS_VERSION = LOGOS64_URL.split('/')[6]
     else:
         logos_error("FLPRODUCT not set in config. Please update your config to specify either 'Logos' or 'Verbum'.")
     os.environ['LOGOS_VERSION'] = LOGOS_VERSION
@@ -711,7 +726,9 @@ def chooseVersion():
         APPDIR_BINDIR = f"{APPDIR}/bin"
         os.environ['APPDIR_BINDIR'] = APPDIR_BINDIR
 
-def wineBinaryVersionCheck(TESTBINARY, TARGETVERSION):
+def wineBinaryVersionCheck(TESTBINARY):
+    global TARGETVERSION
+
     # Does not check for Staging. Will not implement: expecting merging of commits in time.
     if TARGETVERSION == "10":
         WINE_MINIMUM = "7.18"
@@ -723,40 +740,42 @@ def wineBinaryVersionCheck(TESTBINARY, TARGETVERSION):
     # Check if the binary is executable. If so, check if TESTBINARY's version is ≥ WINE_MINIMUM, or if it is Proton or a link to a Proton binary, else remove.
     if os.path.exists(TESTBINARY) and os.access(TESTBINARY, os.X_OK):
         cmd = [TESTBINARY, "--version"]
-        output = subprocess.check_output(cmd).decode("utf-8")
-        TESTWINEVERSION = re.search(r"-\s([\d.]+)", output).group(1)
-        TESTWINEVERSION = float(TESTWINEVERSION)
-        if TESTWINEVERSION >= float(WINE_MINIMUM):
-            if TESTWINEVERSION != 8.0:
+        version_string = subprocess.check_output(cmd).decode("utf-8")
+        version_number = version_string.split("-")[-1]
+        print("version_string:" + version_string)
+        print("version_number:" + str(version_number))
+        if version_number is not None:
+            TESTWINEVERSION = float(version_number)
+            if TESTWINEVERSION >= float(WINE_MINIMUM):
+                if TESTWINEVERSION != 8.0:
+                    return True
+            elif "Proton - Experimental" in TESTBINARY:
                 return True
-        elif re.search("Proton - Experimental", TESTBINARY):
-            return True
-        # If it is a symlink, check its actual path. If it is Proton, let it pass.
-        elif os.path.islink(TESTBINARY):
-            TESTWINE = os.path.realpath(TESTBINARY)
-            if re.search("Proton - Experimental", TESTWINE):
-                return True
+            # If it is a symlink, check its actual path. If it is Proton, let it pass.
+            elif os.path.islink(TESTBINARY):
+                TESTWINE = os.path.realpath(TESTBINARY)
+                if "Proton - Experimental" in TESTWINE:
+                    return True
+            else:
+                return False
         else:
-            return False
-    
-    return False
-
-def checkPath(TESTBINARY):
-    paths = os.environ["PATH"].split(":")
-    for path in paths:
-        binary_path = os.path.join(path, TESTBINARY)
-        if os.path.exists(binary_path) and os.access(binary_path, os.X_OK):
-            return binary_path
-    
-    return None
+            TESTWINEVERSION = None
+    else:
+        return False
 
 def createWineBinaryList():
     logos_info("Creating binary list.")
+    WORKDIR = os.environ.get("WORKDIR")
     # TODO: Make optarg to add custom path to this list.
-    WineBinPathList = ["/usr/local/bin", os.path.expanduser("~") + "/bin",
-                       os.path.expanduser("~") + "/PlayOnLinux/wine/linux-amd64/*/bin",
-                       os.path.expanduser("~") + "/.steam/steam/steamapps/common/Proton - Experimental/files/bin",
-                       CUSTOMBINPATH]
+    CUSTOMBINPATH = os.environ.get("CUSTOMBINPATH", "")
+
+    WineBinPathList = [
+        "/usr/local/bin",
+        os.path.expanduser("~") + "/bin",
+        os.path.expanduser("~") + "/PlayOnLinux/wine/linux-amd64/*/bin",
+        os.path.expanduser("~") + "/.steam/steam/steamapps/common/Proton - Experimental/files/bin",
+        CUSTOMBINPATH
+    ]
 
     # Temporarily modify PATH for additional WINE64 binaries.
     for p in WineBinPathList:
@@ -764,106 +783,93 @@ def createWineBinaryList():
             os.environ['PATH'] = os.environ['PATH'] + os.pathsep + p
 
     # Check each directory in PATH for wine64; add to list
-    checkPath("wine64", WORKDIR + "/winebinaries")
+    binaries = []
+    paths = os.environ["PATH"].split(":")
+    for path in paths:
+        binary_path = os.path.join(path, "wine64")
+        if os.path.exists(binary_path) and os.access(binary_path, os.X_OK):
+            binaries.append(binary_path)
 
-    shutil.copy(WORKDIR + "/winebinaries", WORKDIR + "/winebinaries.bak")
+    print("BINARIES:", binaries)
 
-    # Check remaining binary versions
-    with open(WORKDIR + "/winebinaries.bak", "r") as file:
-        lines = file.readlines()
-        for line in lines:
-            i = line.strip()
-            if not wineBinaryVersionCheck(i):
-                with open(WORKDIR + "/winebinaries", "r+") as file:
-                    lines = file.readlines()
-                    file.seek(0)
-                    for line in lines:
-                        if i not in line.strip():
-                            file.write(line)
-                    file.truncate()
-
-def createWineBinaryList():
-    # Add your implementation here
-    pass
-
-def no_diag_msg(msg):
-    print(msg)
+    for binary in binaries[:]:
+        if wineBinaryVersionCheck(binary):
+            continue
+        else:
+            binaries.remove(binary)
+    
+    return binaries
 
 def chooseInstallMethod():
-
     if not os.environ.get("WINEPREFIX"):
-        os.environ["WINEPREFIX"] = os.path.join(APPDIR, "wine64_bottle")
+        os.environ["WINEPREFIX"] = os.path.join(os.environ["APPDIR"], "wine64_bottle")
 
     if not os.environ.get("WINE_EXE"):
-        createWineBinaryList()
-        
+        binaries = createWineBinaryList()
         WINEBIN_OPTIONS = []
         
         # Add AppImage to list
-        if TARGETVERSION != "9":
-            if DIALOG == "whiptail" or DIALOG == "dialog":
-                WINEBIN_OPTIONS.append("AppImage " + os.path.join(APPDIR_BINDIR, WINE64_APPIMAGE_FULL_FILENAME) + " AppImage of Wine64 " + WINE64_APPIMAGE_FULL_VERSION + " ON")
+        if os.environ["TARGETVERSION"] != "9":
+            if os.environ.get('DIALOG') in ["whiptail", "dialog", "curses"]:
+                WINEBIN_OPTIONS.append([f"AppImage {os.environ['APPDIR_BINDIR']}/{os.environ['WINE64_APPIMAGE_FULL_FILENAME']}", f"AppImage of Wine64 {os.environ['WINE64_APPIMAGE_FULL_VERSION']}"])
             elif DIALOG == "zenity":
-                WINEBIN_OPTIONS.append("TRUE AppImage AppImage of Wine64 " + WINE64_APPIMAGE_FULL_VERSION + " " + os.path.join(APPDIR_BINDIR, WINE64_APPIMAGE_FULL_FILENAME))
-            elif DIALOG == "kdialog":
+                WINEBIN_OPTIONS.append("TRUE AppImage AppImage of Wine64 " + os.environ["WINE64_APPIMAGE_FULL_VERSION"] + " " + os.path.join(os.environ["APPDIR_BINDIR"], os.environ["WINE64_APPIMAGE_FULL_FILENAME"]))
+            elif os.environ["DIALOG"] == "kdialog":
                 no_diag_msg("kdialog not implemented.")
             else:
                 no_diag_msg("No dialog tool found.")
         
-        while True:
-            line = sys.stdin.readline().strip() # Read input from stdin
-            if not line: break
+        for binary in binaries:
+            WINEBIN_PATH = binary
             
             # Set binary code, description, and path based on path
-            if os.path.islink(line):
-                WINEOPT = os.path.realpath(line)
+            if "/usr/bin/" in binary:
+                WINEBIN_CODE = "System"
+                WINEBIN_DESCRIPTION = "\"Use the system binary (i.e., /usr/bin/wine64). WINE must be 7.18-staging or later. Stable or Devel do not work.\""
+            elif "Proton" in binary:
+                WINEBIN_CODE = "Proton"
+                WINEBIN_DESCRIPTION = "\"Install using the Steam Proton fork of WINE.\""
+            elif "PlayOnLinux" in binary:
+                WINEBIN_CODE = "PlayOnLinux"
+                WINEBIN_DESCRIPTION = "\"Install using a PlayOnLinux WINE64 binary.\""
             else:
-                WINEOPT = line
-
-            if "/usr/bin/" in WINEOPT:
-                WINEOPT_CODE = "System"
-                WINEOPT_DESCRIPTION = "\"Use the system binary (i.e., /usr/bin/wine64). WINE must be 7.18-staging or later. Stable or Devel do not work.\""
-                WINEOPT_PATH = line
-            elif "Proton" in WINEOPT:
-                WINEOPT_CODE = "Proton"
-                WINEOPT_DESCRIPTION = "\"Install using the Steam Proton fork of WINE.\""
-                WINEOPT_PATH = line
-            elif "PlayOnLinux" in WINEOPT:
-                WINEOPT_CODE = "PlayOnLinux"
-                WINEOPT_DESCRIPTION = "\"Install using a PlayOnLinux WINE64 binary.\""
-                WINEOPT_PATH = line
-            else:
-                WINEOPT_CODE = "Custom"
-                WINEOPT_DESCRIPTION = "\"Use a WINE64 binary from another directory.\""
-                WINEOPT_PATH = line
+                WINEBIN_CODE = "Custom"
+                WINEBIN_DESCRIPTION = "\"Use a WINE64 binary from another directory.\""
 
             # Create wine binary option array
-            if DIALOG == "whiptail" or DIALOG == "dialog":
-                WINEBIN_OPTIONS.append(WINEOPT_CODE + " " + WINEOPT_PATH + " " + WINEOPT_DESCRIPTION + " OFF")
-            elif DIALOG == "zenity":
-                WINEBIN_OPTIONS.append("FALSE " + WINEOPT_CODE + " " + WINEOPT_DESCRIPTION + " " + WINEOPT_PATH)
-            elif DIALOG == "kdialog":
+            if os.environ.get('DIALOG') in ["whiptail", "dialog", "curses"]:
+                WINEBIN_OPTIONS.append(WINEBIN_CODE + " " + WINEBIN_PATH + " " + WINEBIN_DESCRIPTION + " OFF")
+            elif os.environ["DIALOG"] == "zenity":
+                WINEBIN_OPTIONS.append("FALSE " + WINEBIN_CODE + " " + WINEBIN_DESCRIPTION + " " + WINEBIN_PATH)
+            elif os.environ["DIALOG"] == "kdialog":
                 no_diag_msg("kdialog not implemented.")
             else:
                 no_diag_msg("No dialog tool found.")
 
-        installArray = subprocess.check_output(["zenity", "--width=1024", "--height=480", "--title=" + TITLE, "--text=" + QUESTION_TEXT, "--list", "--radiolist"] + WINEBIN_OPTIONS + ["--print-column=2,3,4"]).decode().strip().split('|')
+        FLPRODUCT=os.environ.get("FLPRODUCT", "")
+        LOGOS_VERSION=os.environ.get("LOGOS_VERSION", "")
+        INSTALLDIR=os.environ.get("INSTALLDIR", "")
+        BACKTITLE="Choose Wine Binary Menu"
+        TITLE="Choose Wine Binary"
+        QUESTION_TEXT=f"Which Wine binary and install method should the script use to install {FLPRODUCT} v{LOGOS_VERSION} in {INSTALLDIR}?"
 
-        WINEBIN_CODE = installArray[0]
-        WINE_EXE = installArray[2]
-    elif DIALOG == "zenity":
+    if os.environ.get('DIALOG') in ["whiptail", "dialog", "curses"]:
+        installationChoice = curses_menu(binaries, TITLE, QUESTION_TEXT)
+        WINECHOICE_CODE = installChoice[0]
+        WINE_EXE = installChoice[2]
+    elif os.environ["DIALOG"] == "zenity":
         column_names = ["--column", "Choice", "--column", "Code", "--column", "Description", "--column", "Path"]
         installationChoice = subprocess.check_output(["zenity", "--width=1024", "--height=480", "--title=" + TITLE, "--text=" + QUESTION_TEXT, "--list", "--radiolist"] + column_names + WINEBIN_OPTIONS + ["--print-column=2,3,4"]).decode().strip()
         installArray = installationChoice.split('|')
-        WINEBIN_CODE = installArray[0]
+        WINECHOICE_CODE = installArray[0]
         WINE_EXE = installArray[2]
-    elif DIALOG == "kdialog":
+    elif os.environ["DIALOG"] == "kdialog":
         no_diag_msg("kdialog not implemented.")
     else:
         no_diag_msg("No dialog tool found.")
 
     verbose()
-    print(f"chooseInstallMethod(): WINEBIN_CODE: {WINEBIN_CODE}; WINE_EXE: {WINE_EXE}")
+    print(f"chooseInstallMethod(): WINEBIN_CODE: {WINECHOICE_CODE}; WINE_EXE: {WINE_EXE}")
 
 def checkExistingInstall():
     # Now that we know what the user wants to install and where, determine whether an install exists and whether to continue.
@@ -955,7 +961,7 @@ def setWinetricks():
                 backtitle = "Choose Winetricks Menu"
                 title = "Choose Winetricks"
                 question_text = "Should the script use the system's local winetricks or download the latest winetricks from the Internet? The script needs to set some Wine options that FLPRODUCT requires on Linux."
-                if os.getenv("DIALOG") == "whiptail" or os.getenv("DIALOG") == "dialog":
+                if os.environ.get('DIALOG') in ["whiptail", "dialog", "curses"]:
                     dialog_choice = subprocess.Popen(
                         [os.getenv("DIALOG"), "--backtitle", backtitle, "--title", title, "--radiolist", question_text, "0", "0", "0", "1", "Use local winetricks.", "ON", "2", "Download winetricks from the Internet."], 
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE
