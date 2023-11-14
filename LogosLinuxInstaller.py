@@ -9,6 +9,7 @@ import time
 import tempfile
 import re
 import curses
+import textwrap
 import requests
 from xml.etree import ElementTree as ET
 
@@ -313,43 +314,80 @@ def curses_menu(options, title, question_text):
     # Set up the screen
     stdscr = curses.initscr()
     curses.curs_set(0)
-    stdscr.nodelay(1)
-    stdscr.timeout(100)
 
-    # Define the options for the radio list
     current_option = 0
 
     while True:
         stdscr.clear()
-        height, width = stdscr.getmaxyx()
 
-        # Display the title text
-        stdscr.addstr(1, 2, title, curses.A_BOLD)
-        # Display the question text
-        stdscr.addstr(height//2 - len(options)//2 - 2, width//2 - len(question_text)//2, question_text)
+        window_height, window_width = stdscr.getmaxyx()
+        window_y = window_height // 2 - len(options) // 2
+        window_x = window_width // 2 - max(len(option) for option in options) // 2
+        #window_y = max(0, current_option - window_height // 2)
+        #window_x = 0  # You can adjust this based on your layout
 
-        # Display the radio list options
+        # Wrap the title and question text
+        wrapped_title = textwrap.fill(title, window_width - 4)
+        wrapped_question = textwrap.fill(question_text, window_width - 4)
+
+        # Display the wrapped title text, line by line, centered
+        title_lines = wrapped_title.split('\n')
+        title_start_y = max(0, window_height // 2 - len(title_lines) // 2)
+        for i, line in enumerate(title_lines):
+            if i < window_height:
+                stdscr.addstr(i, 2, line, curses.A_BOLD)
+
+        # Display the wrapped question text, line by line, centered
+        question_lines = wrapped_question.split('\n')
+        question_start_y = title_start_y + len(title_lines) + 1
+        question_width = max(len(line) for line in question_lines)
+        for i, line in enumerate(question_lines):
+            if question_start_y + i < window_height:
+                x = window_width // 2 - question_width // 2
+                stdscr.addstr(question_start_y + i, x, line)
+
+        # Display the options, centered
+        options_start_y = question_start_y + len(question_lines) + 2
+        window = curses.newwin(window_height, window_width, options_start_y, 2)
         for i, option in enumerate(options):
-            x = width//2 - len(option)//2
-            y = height//2 - len(options)//2 + i
             if i == current_option:
-                stdscr.attron(curses.A_REVERSE)
-                stdscr.addstr(y, x, option)
-                stdscr.attroff(curses.A_REVERSE)
+                window.addstr(i, 0, option, curses.A_REVERSE)
             else:
-                stdscr.addstr(y, x, option)
+                window.addstr(i, 0, option)
+
+        #for i, option in enumerate(options):
+        #    x = window_width // 2 - len(option) // 2
+        #    y = options_start_y + i
+        #    if y < window_height:
+        #        if i == current_option:
+        #            stdscr.addstr(y, x, option, curses.A_REVERSE)
+        #        else:
+        #            stdscr.addstr(y, x, option)
+
+        # Refresh the windows
+        stdscr.refresh()
 
         # Get user input
         key = stdscr.getch()
 
-        # Process user input
-        if key == curses.KEY_UP:
-            current_option = max(0, current_option-1)
-        elif key == curses.KEY_DOWN:
-            current_option = min(len(options)-1, current_option+1)
-        elif key == ord('\n'):  # User presses Enter
+        while key == 27:  # Check for escape sequences
+            next_key = stdscr.getch()
+            if next_key == -1:  # No more characters in the buffer
+                break
+            elif next_key == 91:  # Check for '[' (indicating arrow key)
+                arrow_key = stdscr.getch()
+                if arrow_key == 65:  # Up arrow key
+                    key = curses.KEY_UP
+                    current_option = max(0, current_option-1)
+                elif arrow_key == 66:  # Down arrow key
+                    key = curses.KEY_DOWN
+                    current_option = min(len(options)-1, current_option+1)
+
+        if key == 10: # Enter key
             choice = options[current_option]
             break
+        else:
+            key = next_key
 
     curses.endwin()
     return choice
@@ -638,19 +676,39 @@ def getLogosReleaseVersion(TARGETVERSION):
         # Parse XML
         root = ET.fromstring(response.text)
         xmldata = ET.tostring(root, encoding="utf-8", method="xml").decode("utf-8")
-
+        # Define namespaces
+        namespaces = {
+            'ns0': 'http://www.w3.org/2005/Atom',
+            'ns1': 'http://services.logos.com/update/v1/'
+        }
         # Define the pattern to find the version string
-        pattern = re.compile(r'version="([\d.]+)"')
+        #pattern = re.compile(r'version="([\d.]+)"')
 
         # Search for the pattern in the XML data
-        match = pattern.search(xmldata)
+        #match = pattern.search(xmldata)
 
         # Check if a match is found
-        if match:
-            logos_release_version = match.group(1)
-        else:
-            print("Version not found")
+        #if match:
+        #    logos_release_version = match.group(1)
+        #else:
+        #    print("Version not found")
 
+        # Extract versions
+        releases = []
+        
+        # Obtain last five releases
+        for entry in root.findall('.//ns1:version', namespaces):
+            release = entry.text
+            releases.append(release)
+        
+            #if len(releases) == 5:
+            #    break
+
+        FLPRODUCT = os.environ.get('FLPRODUCT')
+
+        TITLE=f"Choose {FLPRODUCT} {TARGETVERSION} Release"
+        QUESTION_TEXT=f"Which version of {FLPRODUCT} {TARGETVERSION} do you want to install?"
+        curses_menu(releases, TITLE, QUESTION_TEXT)
     except requests.RequestException as e:
         print(f"Error fetching or parsing XML: {e}")
         return None
