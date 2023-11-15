@@ -577,16 +577,16 @@ def wait_process_using_dir(directory):
         time.sleep(VERIFICATION_TIME)
 
         try:
-            FIST_PID = subprocess.check_output(["lsof", "-t", VERIFICATION_DIR]).decode().split("\n")[0]
+            FIRST_PID = subprocess.check_output(["lsof", "-t", VERIFICATION_DIR]).decode().split("\n")[0]
         except subprocess.CalledProcessError:
             FIRST_PID = ""
         verbose()
-        print(f"wait_process_using_dir FIST_PID: {FIST_PID}")
-        if FIST_PID:
+        print(f"wait_process_using_dir FIRST_PID: {FIRST_PID}")
+        if FIRST_PID:
             i = 0
             verbose()
-            print(f"wait_process_using_dir: tail --pid={FIST_PID} -f /dev/null")
-            subprocess.run(["tail", "--pid", FIST_PID, "-f", "/dev/null"])
+            print(f"wait_process_using_dir: tail --pid={FIRST_PID} -f /dev/null")
+            subprocess.run(["tail", "--pid", FIRST_PID, "-f", "/dev/null"])
             continue
 
         if i >= VERIFICATION_NUM:
@@ -747,7 +747,6 @@ def chooseProduct():
         os.environ["LOGOS_ICON_URL"] = "https://raw.githubusercontent.com/ferion11/LogosLinuxInstaller/master/img/" + os.environ.get("FLPRODUCTi") + "-128-icon.png"
 
 def getLogosReleaseVersion(targetversion):
-    global TARGETVERSION
     os.environ['TARGETVERSION'] = TARGETVERSION = targetversion
     url = f"https://clientservices.logos.com/update/v1/feed/logos{TARGETVERSION}/stable.xml"
 
@@ -793,7 +792,6 @@ def getLogosReleaseVersion(targetversion):
         print("Failed to fetch LOGOS_RELEASE_VERSION.")
 
 def chooseVersion():
-    global TARGETVERSION
     TARGETVERSION = os.environ.get('TARGETVERSION')
     DIALOG = os.environ.get('DIALOG')
     BACKTITLE = "Choose Version Menu"
@@ -815,10 +813,10 @@ def chooseVersion():
     
     if "10" in versionChoice:
         checkDependenciesLogos10()
-        TARGETVERSION = "10"
+        os.environ["TARGETVERSION"] = TARGETVERSION = "10"
     elif "9" in versionChoice:
         checkDependenciesLogos9()
-        TARGETVERSION = "9"
+        os.environ["TARGETVERSION"] = TARGETVERSION = "9"
     elif versionChoice == "Exit.":
         exit()
     else:
@@ -857,7 +855,7 @@ def chooseVersion():
         os.environ['APPDIR_BINDIR'] = APPDIR_BINDIR
 
 def wineBinaryVersionCheck(TESTBINARY):
-    global TARGETVERSION
+    TARGETVERSION = os.environ.get('TARGETVERSION')
 
     # Does not check for Staging. Will not implement: expecting merging of commits in time.
     if TARGETVERSION == "10":
@@ -1103,20 +1101,22 @@ def initializeWineBottle():
     except subprocess.CalledProcessError as e:
         print (f"Error 2 running wineboot: {e}")
 
-    print("Wrapping up IWB")
     light_wineserver_wait()
-    print("IWB finished")
 
 def wine_reg_install(REG_FILENAME):
     WORKDIR = os.environ.get('WORKDIR')
-    subprocess.Popen(["regedit.exe", REG_FILENAME], cwd=WORKDIR).communicate()
+    WINEPREFIX = os.environ.get('WINEPREFIX')
+    WINE_EXE = os.environ.get('WINE_EXE')
+    FILENAME=str(REG_FILENAME)
+    process = subprocess.Popen([WINE_EXE, "regedit.exe", REG_FILENAME], stdout=subprocess.PIPE, stderr=subprocess.PIPE, env={"WINEPREFIX": WINEPREFIX}, text=True, cwd=WORKDIR)
+    print(f"{FILENAME} installed.")
     light_wineserver_wait()
     
 def downloadWinetricks():
     APPDIR_BINDIR = os.environ.get('APPDIR_BINDIR')
     WINETRICKS_URL = os.environ.get('WINETRICKS_URL')
     logos_reuse_download(WINETRICKS_URL, "winetricks", APPDIR_BINDIR)
-    subprocess.Popen(["chmod", "755" "{}/winetricks".format(APPDIR_BINDIR)], stdout=subprocess.PIPE).communicate()
+    os.chmod(f"{APPDIR_BINDIR}/winetricks", 0o755)
 
 def setWinetricks():
     APPDIR_BINDIR = os.environ.get('APPDIR_BINDIR')
@@ -1127,28 +1127,28 @@ def setWinetricks():
         if subprocess.call(["which", "winetricks"]) == 0:
             # Check if local winetricks version is up-to-date; if so, offer to use it or to download; else, download it
             local_winetricks_version = subprocess.check_output(["winetricks", "--version"]).split()[0]
-            if local_winetricks_version >= "20220411":
+            if str(local_winetricks_version) >= "20220411":
                 backtitle = "Choose Winetricks Menu"
                 title = "Choose Winetricks"
                 question_text = "Should the script use the system's local winetricks or download the latest winetricks from the Internet? The script needs to set some Wine options that FLPRODUCT requires on Linux."
                 if os.environ.get('DIALOG') in ["whiptail", "dialog", "curses"]:
                     options = ["1: Use local winetricks.", "2: Download winetricks from the Internet"]
-                    winetricks_choice = curses_menu()
+                    winetricks_choice = curses_menu(options, "Choose Winetricks", "Which winetricks would you like to use?")
                 elif os.getenv("DIALOG") == "zenity":
-                    dialog_choice = subprocess.Popen(
+                    winetricks_choice = subprocess.Popen(
                         ["zenity", "--width=700", "--height=310", "--title=" + title, "--text=" + question_text, "--list", "--radiolist", "--column", "S", "--column", "Description", "TRUE", "1- Use local winetricks.", "FALSE", "2- Download winetricks from the Internet."], 
-                        stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
                     )
-                    winetricks_choice = dialog_choice.communicate()[0]
                 elif os.getenv("DIALOG") == "kdialog":
                     sys.exit("kdialog not implemented.")
                 else:
                     sys.exit("No dialog tool found.")
 
-                if winetricks_choice.startswith(b"1"):
-                    print("Setting winetricks to the local binary...")
-                    os.environ["WINETRICKSBIN"] = subprocess.check_output(["which", "winetricks"]).strip()
-                elif winetricks_choice.startswith(b"2"):
+                print(f"winetricks_choice: {winetricks_choice}")
+                if winetricks_choice.startswith("1"):
+                    print("Setting winetricks to the local binary…")
+                    os.environ["WINETRICKSBIN"] = subprocess.check_output(["which", "winetricks"]).decode('utf-8').strip()
+                elif winetricks_choice.startswith("2"):
                     downloadWinetricks()
                     os.environ["WINETRICKSBIN"] = os.path.join(os.getenv("APPDIR_BINDIR"), "winetricks")
                 else:
@@ -1158,13 +1158,14 @@ def setWinetricks():
                 downloadWinetricks()
                 os.environ["WINETRICKSBIN"] = os.path.join(os.getenv("APPDIR_BINDIR"), "winetricks")
         else:
-            print("Local winetricks not found. Downloading winetricks from the Internet...")
+            print("Local winetricks not found. Downloading winetricks from the Internet…")
             downloadWinetricks()
             os.environ["WINETRICKSBIN"] = os.path.join(os.getenv("APPDIR_BINDIR"), "winetricks")
 
     print("Winetricks is ready to be used.")
 
 def winetricks_install(*args):
+    WINETRICKSBIN = os.environ.get('WINETRICKSBIN')
     verbose and print("winetricks", *args)
     if DIALOG in ["whiptail", "dialog", 'curses']:
         subprocess.call([WINETRICKSBIN, *args])
@@ -1222,7 +1223,24 @@ def getPremadeWineBottle():
     logos_progress("Extracting…", "Extracting: " + WINE64_BOTTLE_TARGZ_NAME + "\ninto: " + APPDIR)
 
 ## END WINE BOTTLE AND WINETRICKS FUNCTIONS
-## BEGIN LOGOS INSTALL FUNCTIONS
+## BEGIN LOGOS INSTALL FUNCTIONS 
+def installFonts():
+    if os.environ.get('WINETRICKS_UNATTENDED') is None:
+        if os.environ.get('SKIP_FONTS') is None:
+            winetricks_install('-q', 'corefonts')
+            winetricks_install('-q', 'tahoma')
+    else:
+        if os.environ.get('SKIP_FONTS') is None:
+            winetricks_install('corefonts')
+            winetricks_install('tahoma')
+    winetricks_install('-q', 'settings', 'fontsmooth=rgb')
+
+def installD3DCompiler():
+    if os.environ.get('WINETRICKS_UNATTENDED') is None:
+        winetricks_dll_install('-q', 'd3dcompiler_47')
+    else:
+        winetricks_dll_install('d3dcompiler_47')
+
 def get_logos_executable():
     LOGOS_EXECUTABLE = os.environ.get('LOGOS_EXECUTABLE')
     LOGOS64_URL = os.environ.get('LOGOS64_URL')
@@ -1252,7 +1270,7 @@ def get_logos_executable():
         logos_download(LOGOS64_URL, f"{HOME}/Downloads/")
         shutil.move(f"{HOME}/Downloads/{LOGOS64_MSI}", f"{HOME}/Downloads/{LOGOS_EXECUTABLE}")
         shutil.copy(f"{HOME}/Downloads/{LOGOS_EXECUTABLE}", f"{APPDIR}/")
-        
+
 def install_msi():
     LOGOS_EXECUTABLE = os.environ.get('LOGOS_EXECUTABLE')
     WINE_EXE = os.environ.get('WINE_EXE')
@@ -1260,23 +1278,6 @@ def install_msi():
     # Execute the .MSI
     verbose() and print(f"Running: {WINE_EXE} msiexec /i {APPDIR}/{LOGOS_EXECUTABLE}")
     subprocess.run([WINE_EXE, "msiexec", "/i", f"{APPDIR}/{LOGOS_EXECUTABLE}"])
-
-def installFonts():
-    if os.environ.get('WINETRICKS_UNATTENDED') is None:
-        if os.environ.get('SKIP_FONTS') is None:
-            winetricks_install('-q', 'corefonts')
-            winetricks_install('-q', 'tahoma')
-    else:
-        if os.environ.get('SKIP_FONTS') is None:
-            winetricks_install('corefonts')
-            winetricks_install('tahoma')
-    winetricks_install('-q', 'settings', 'fontsmooth=rgb')
-
-def installD3DCompiler():
-    if os.environ.get('WINETRICKS_UNATTENDED') is None:
-        winetricks_dll_install('-q', 'd3dcompiler_47')
-    else:
-        winetricks_dll_install('d3dcompiler_47')
 
 def installLogos9():
     FLPRODUCT = os.environ.get('FLPRODUCT')
@@ -1297,7 +1298,6 @@ def installLogos9():
 def installLogos10():
     WORKDIR = os.environ.get('WORKDIR')
     WINETRICKS_UNATTENDED = os.environ.get('WINETRICKS_UNATTENDED')
-    print("Installing Logos 10…")
     with open(os.path.join(WORKDIR, 'disable-winemenubuilder.reg'), 'w') as reg_file, \
             open(os.path.join(WORKDIR, 'renderer_gdi.reg'), 'w') as gdi_file:
         reg_file.write('''REGEDIT4
@@ -1313,9 +1313,8 @@ def installLogos10():
 "renderer"="gdi"
 ''')
 
-    print("Regex files created. Installing…")
-    wine_reg_install("disable-winemenubuilder.reg")
-    wine_reg_install("renderer_gdi.reg")
+    wine_reg_install(f"{reg_file}")
+    wine_reg_install(f"{gdi_file}")
 
     setWinetricks()
     installFonts()
@@ -1454,10 +1453,6 @@ def main():
     print(f"{os.environ.get('LOGOS_SCRIPT_TITLE')}, {os.environ.get('LOGOS_SCRIPT_VERSION')} by {os.environ.get('LOGOS_SCRIPT_AUTHOR')}.")
     # BEGIN PREPARATION
     REGENERATE = os.environ.get('REGENERATE')
-    TARGETVERSION = os.environ.get('TARGETVERSION')
-    LOGOS_EXE = os.environ.get('LOGOS_EXE')
-    FLPRODUCT = os.environ.get('FLPRODUCT')
-    WINEPREFIX = os.environ.get('WINEPREFIX')
     LOGOS_LOG = os.environ.get('LOGOS_LOG')
     if verbose:
         print(datetime.datetime.now())
@@ -1473,13 +1468,20 @@ def main():
     chooseInstallMethod()  # We ask user for his desired install method.
     # END PREPARATION
     
+    TARGETVERSION = os.environ.get('TARGETVERSION')
+    LOGOS_EXE = os.environ.get('LOGOS_EXE')
+    FLPRODUCT = os.environ.get('FLPRODUCT')
+    WINEPREFIX = os.environ.get('WINEPREFIX')
+
     if REGENERATE is None or REGENERATE == "":
         if verbose:
             print(datetime.datetime.now())
         checkExistingInstall()
+        
         if verbose:
             print(datetime.datetime.now())
         beginInstall()
+
         if verbose:
             print(datetime.datetime.now())
         initializeWineBottle()  # We run wineboot.
@@ -1493,12 +1495,14 @@ def main():
                 print(datetime.datetime.now())
             installLogos9()  # We run the commands specific to Logos 9.
         else:
-            logos_error("Installation canceled!", "")
+            logos_error(f"TARGETVERSION unrecognized: '{TARGETVERSION}'. Installation canceled!", "")
         
         if verbose:
             print(datetime.datetime.now())
         create_starting_scripts()
+        
         heavy_wineserver_wait()
+        
         clean_all()
         
         LOGOS_EXE = subprocess.run(["find", WINEPREFIX, "-name", f"{FLPRODUCT}.exe"], capture_output=True, text=True).stdout.strip()
