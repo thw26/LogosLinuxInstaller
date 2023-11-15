@@ -1079,41 +1079,33 @@ def beginInstall():
     if not WINESERVER_EXE or WINESERVER_EXE == "":
         wineserver_path = os.path.join(os.path.dirname(WINE_EXE), "wineserver")
         if os.path.exists(wineserver_path):
-            WINESERVER_EXE = wineserver_path
+            os.environ["WINESERVER_EXE"] = WINESERVER_EXE = wineserver_path
+
         else:
             print(f"{wineserver_path} not found. Please either add it or create a symlink to it, and rerun.")
 
-def prepareWineBottle():
+def initializeWineBottle():
     WINEPREFIX = os.environ.get('WINEPREFIX')
     WINE_EXE = os.environ.get('WINE_EXE')
-    WINEBOOT_GUI = os.environ.get('WINEBOOT_GUI')
     logos_continue_question(
         f"Now the script will create and configure the Wine Bottle at {WINEPREFIX}. You can cancel the installation of Mono. Do you wish to continue?", f"The installation was cancelled!", "")
     
     env = os.environ.copy()
-    env['DISPLAY'] = ''
-    command = [WINE_EXE, "wineboot"]
-    if WINEPREFIX:
-        env_command = [f"WINEPREFIX={WINEPREFIX}"]
-        full_command = env_command + command
-    else:
-        full_command = command
 
     try:
-        print(f"Running: {full_command}")
-        process = subprocess.run(full_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True, shell=True)
+        process = subprocess.run([WINE_EXE, "wineboot"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, env={"WINEPREFIX": WINEPREFIX}, text=True)
 
         if process.returncode != 0:
             print (f"Error 1 running wineboot: {return_code}")
         else:
             print(f"Finished running wineboot.")
-            print("stdout:", process.stdout)
-            print("stderr:", process.stderr)
 
     except subprocess.CalledProcessError as e:
         print (f"Error 2 running wineboot: {e}")
 
+    print("Wrapping up IWB")
     light_wineserver_wait()
+    print("IWB finished")
 
 def wine_reg_install(REG_FILENAME):
     WORKDIR = os.environ.get('WORKDIR')
@@ -1305,6 +1297,7 @@ def installLogos9():
 def installLogos10():
     WORKDIR = os.environ.get('WORKDIR')
     WINETRICKS_UNATTENDED = os.environ.get('WINETRICKS_UNATTENDED')
+    print("Installing Logos 10…")
     with open(os.path.join(WORKDIR, 'disable-winemenubuilder.reg'), 'w') as reg_file, \
             open(os.path.join(WORKDIR, 'renderer_gdi.reg'), 'w') as gdi_file:
         reg_file.write('''REGEDIT4
@@ -1320,6 +1313,7 @@ def installLogos10():
 "renderer"="gdi"
 ''')
 
+    print("Regex files created. Installing…")
     wine_reg_install("disable-winemenubuilder.reg")
     wine_reg_install("renderer_gdi.reg")
 
@@ -1488,7 +1482,7 @@ def main():
         beginInstall()
         if verbose:
             print(datetime.datetime.now())
-        prepareWineBottle()  # We run wineboot.
+        initializeWineBottle()  # We run wineboot.
         
         if TARGETVERSION == "10":
             if verbose:
