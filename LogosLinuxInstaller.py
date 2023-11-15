@@ -7,6 +7,7 @@ import atexit
 import datetime
 import time
 import tempfile
+import argparse
 import re
 import curses
 import textwrap
@@ -561,6 +562,7 @@ def getAppImage():
     logos_reuse_download(WINE64_APPIMAGE_FULL_URL, WINE64_APPIMAGE_FULL_FILENAME, APPDIR_BINDIR)
 
 def wait_process_using_dir(directory):
+    #TODO: Something in here is returning a NoneType
     VERIFICATION_DIR = directory
     VERIFICATION_TIME = 7
     VERIFICATION_NUM = 3
@@ -1085,8 +1087,7 @@ def beginInstall():
 def initializeWineBottle():
     WINEPREFIX = os.environ.get('WINEPREFIX')
     WINE_EXE = os.environ.get('WINE_EXE')
-    logos_continue_question(
-        f"Now the script will create and configure the Wine Bottle at {WINEPREFIX}. You can cancel the installation of Mono. Do you wish to continue?", f"The installation was cancelled!", "")
+    #logos_continue_question(f"Now the script will create and configure the Wine Bottle at {WINEPREFIX}. You can cancel the installation of Mono. Do you wish to continue?", f"The installation was cancelled!", "")
     
     env = os.environ.copy()
 
@@ -1133,7 +1134,7 @@ def setWinetricks():
                 question_text = "Should the script use the system's local winetricks or download the latest winetricks from the Internet? The script needs to set some Wine options that FLPRODUCT requires on Linux."
                 if os.environ.get('DIALOG') in ["whiptail", "dialog", "curses"]:
                     options = ["1: Use local winetricks.", "2: Download winetricks from the Internet"]
-                    winetricks_choice = curses_menu(options, "Choose Winetricks", "Which winetricks would you like to use?")
+                    winetricks_choice = curses_menu(options, title, question_text)
                 elif os.getenv("DIALOG") == "zenity":
                     winetricks_choice = subprocess.Popen(
                         ["zenity", "--width=700", "--height=310", "--title=" + title, "--text=" + question_text, "--list", "--radiolist", "--column", "S", "--column", "Description", "TRUE", "1- Use local winetricks.", "FALSE", "2- Download winetricks from the Internet."], 
@@ -1207,7 +1208,7 @@ def winetricks_install(*args):
 def winetricks_dll_install(*args):
     WINETRICKSBIN = os.environ.get('WINETRICKSBIN')
     verbose and print("winetricks", *args)
-    logos_continue_question("Now the script will install the DLL " + " ".join(args) + ". This may take a while. There will not be any GUI feedback for this. Continue?", "The installation was cancelled!", "")
+    #logos_continue_question("Now the script will install the DLL " + " ".join(args) + ". This may take a while. There will not be any GUI feedback for this. Continue?", "The installation was cancelled!", "")
     subprocess.call([WINETRICKSBIN, *args])
     verbose and print("winetricks", *args, "DONE!")
     heavy_wineserver_wait()
@@ -1252,9 +1253,9 @@ def get_logos_executable():
     HOME = os.environ.get('HOME')
     # This VAR is used to verify the downloaded MSI is latest
     if not LOGOS_EXECUTABLE:
-        LOGOS_EXECUTABLE = f"{FLPRODUCT}_v{LOGOS_VERSION}-x64.msi"
+        os.environ["LOGOS_EXECUTABLE"] = LOGOS_EXECUTABLE = f"{FLPRODUCT}_v{LOGOS_VERSION}-x64.msi"
     
-    logos_continue_question(f"Now the script will check for the MSI installer. Then it will download and install {FLPRODUCT} Bible at {WINEPREFIX}. You will need to interact with the installer. Do you wish to continue?", "The installation was cancelled!", "")
+    #logos_continue_question(f"Now the script will check for the MSI installer. Then it will download and install {FLPRODUCT} Bible at {WINEPREFIX}. You will need to interact with the installer. Do you wish to continue?", "The installation was cancelled!", "")
     
     # Getting and installing {FLPRODUCT} Bible
     # First check current directory to see if the .MSI is present; if not, check user's Downloads/; if not, download it new. Once found, copy it to WORKDIR for future use.
@@ -1273,11 +1274,13 @@ def get_logos_executable():
 
 def install_msi():
     LOGOS_EXECUTABLE = os.environ.get('LOGOS_EXECUTABLE')
+    WINEPREFIX = os.environ.get('WINEPREFIX')
     WINE_EXE = os.environ.get('WINE_EXE')
     APPDIR = os.environ.get('APPDIR')
+    env = os.environ.copy()
     # Execute the .MSI
     verbose() and print(f"Running: {WINE_EXE} msiexec /i {APPDIR}/{LOGOS_EXECUTABLE}")
-    subprocess.run([WINE_EXE, "msiexec", "/i", f"{APPDIR}/{LOGOS_EXECUTABLE}"])
+    subprocess.run([WINE_EXE, "msiexec", "/i", f"{APPDIR}/{LOGOS_EXECUTABLE}"], env=env)
 
 def installLogos9():
     FLPRODUCT = os.environ.get('FLPRODUCT')
@@ -1286,8 +1289,8 @@ def installLogos9():
     setWinetricks()
     installFonts()
     installD3DCompiler()
-    getLogosExecutable()
-    installMSI()
+    get_logos_executable()
+    install_msi()
 
     if verbose():
         print("======= Set {}Bible Indexing to Vista Mode: =======".format(FLPRODUCT))
@@ -1325,64 +1328,71 @@ def installLogos10():
     else:
         winetricks_install("settings win10")
 
-    getLogosExecutable()
-    installMSI()
+    get_logos_executable()
+    install_msi()
 
-def getScriptTemplate(script_template):
-    SCRIPT_TEMPLATE = script_template
-    LAUNCHER_TEMPLATE_URL = os.environ.get('LAUNCHER_TEMPLATE_URL')
-    CONTROL_PANEL_TEMPLATE_URL = os.environ.get('CONTROL_PANEL_TEMPLATE_URL')
+def download_script_template(script_template):
     PRESENT_WORKING_DIRECTORY = os.environ.get('PRESENT_WORKING_DIRECTORY')
     WORKDIR = os.environ.get('WORKDIR')
     HOME = os.environ.get('HOME')
-    if SCRIPT_TEMPLATE == "Launcher-Template.sh":
-        SCRIPT_TEMPLATE_URL = LAUNCHER_TEMPLATE_URL
+    if script_template == "Launcher-Template.sh":
+        SCRIPT_TEMPLATE_URL = os.environ.get('LAUNCHER_TEMPLATE_URL')
     else:
-        SCRIPT_TEMPLATE_URL = CONTROL_PANEL_TEMPLATE_URL
+        SCRIPT_TEMPLATE_URL = os.environ.get('CONTROL_PANEL_TEMPLATE_URL')
 
     verbose()
-    print("Downloading the launcher script template…")
+    print(f"Downloading {SCRIPT_TEMPLATE_URL}…")
 
-    if os.path.isfile(os.path.join(PRESENT_WORKING_DIRECTORY, SCRIPT_TEMPLATE)):
+    if os.path.isfile(os.path.join(PRESENT_WORKING_DIRECTORY, script_template)):
         verbose()
-        print(f"{SCRIPT_TEMPLATE} found. Using it…")
-        shutil.copy(os.path.join(PRESENT_WORKING_DIRECTORY, SCRIPT_TEMPLATE), os.path.join(WORKDIR, SCRIPT_TEMPLATE))
-    elif os.path.isfile(os.path.join(HOME, 'Downloads', SCRIPT_TEMPLATE)):
+        print(f"{script_template} found. Using it…")
+        shutil.copy(os.path.join(PRESENT_WORKING_DIRECTORY, script_template), os.path.join(WORKDIR,  script_template))
+    elif os.path.isfile(os.path.join(HOME, 'Downloads',  script_template)):
         verbose()
-        print(f"{SCRIPT_TEMPLATE} found in Downloads. Replacing it…")
-        os.remove(os.path.join(HOME, 'Downloads', SCRIPT_TEMPLATE))
+        print(f"{ script_template} found in Downloads. Replacing it…")
+        os.remove(os.path.join(HOME, 'Downloads',  script_template))
         logos_download(SCRIPT_TEMPLATE_URL, os.path.join(HOME, 'Downloads'))
-        shutil.copy(os.path.join(HOME, 'Downloads', SCRIPT_TEMPLATE), os.path.join(WORKDIR, SCRIPT_TEMPLATE))
+        shutil.copy(os.path.join(HOME, 'Downloads',  script_template), os.path.join(WORKDIR,  script_template))
     else:
         logos_download(SCRIPT_TEMPLATE_URL, os.path.join(HOME, 'Downloads'))
-        shutil.copy(os.path.join(HOME, 'Downloads', SCRIPT_TEMPLATE), os.path.join(WORKDIR, SCRIPT_TEMPLATE))
+        shutil.copy(os.path.join(HOME, 'Downloads',  script_template), os.path.join(WORKDIR,  script_template))
 
-def apply_shell_expansion(file):
+def apply_shell_expansion(file_path):
+    with open(file_path, 'r') as file:
+        data = file.read()
+
+    delimiter = "__apply_shell_expansion_delimiter__"
+    command = f'cat <<{delimiter}\n{data}\n{delimiter}'
+    result = eval(command)
+    return result
+
+def create_script(script_name, launcher_name):
     WORKDIR = os.environ.get('WORKDIR')
     INSTALLDIR = os.environ.get('INSTALLDIR')
     FLPRODUCT = os.environ.get('FLPRODUCT')
-    data = os.system(f"{WORKDIR}/{FLPRODUCT}.sh")
-    os.chmod(f"{WORKDIR}/{FLPRODUCT}.sh", 755)
-    os.rename(f"{WORKDIR}/{FLPRODUCT}.sh", f"{INSTALLDIR}/")
+    
+    download_script_template(f"{script_name}-Template.sh")
+    
+    input_path = os.path.join(WORKDIR, f"{script_name}-Template.sh")
+    output_path = os.path.join(WORKDIR, f"{launcher_name}.sh")
+    
+    with open(input_path, 'r') as file:
+        script_template = file.read()
+    
+    expanded_script = apply_shell_expansion(script_template)
+    
+    with open(output_path, "w") as file:
+        file.write(expanded_script)
 
-def createControlPanel():
-    WORKDIR = os.environ.get('WORKDIR')
-    INSTALLDIR = os.environ.get('INSTALLDIR')
-    getScriptTemplate("controlPanel-Template.sh")
-    with open(f"{WORKDIR}/controlPanel-Template.sh") as template_file:
-        template_data = template_file.read()
-    expanded_data = apply_shell_expansion(f"{WORKDIR}/controlPanel-Template.sh")
-    with open(f"{WORKDIR}/controlPanel.sh", "w") as control_panel_file:
-        control_panel_file.write(expanded_data)
-    os.chmod(f"{WORKDIR}/controlPanel.sh", 755)
-    os.rename(f"{WORKDIR}/controlPanel.sh", f"{INSTALLDIR}/")
+    os.chmod(output_path, 0o755)
+    shutil.move(output_path, INSTALLDIR)
 
 def create_starting_scripts():
     FLPRODUCT = os.environ.get('FLPRODUCT')
     if verbose:
         print(f"Creating starting scripts for {FLPRODUCT}Bible 64 bits...")
-    createLauncher()
-    createControlPanel()
+    create_script("Launcher", f"{FLPRODUCT}")
+    create_control_panel("controlPanel", "controlPanel")
 
 def createConfig():
     HOME = os.environ.get('HOME')
@@ -1450,6 +1460,7 @@ def postInstall():
         logos_error("Installation failed. {LOGOS_EXE} not found. Exiting…\nThe {FLPRODUCT} executable was not found. This means something went wrong while installing {FLPRODUCT}. Please contact the Logos on Linux community for help.", "")
 
 def main():
+    parse_command_line()
     print(f"{os.environ.get('LOGOS_SCRIPT_TITLE')}, {os.environ.get('LOGOS_SCRIPT_VERSION')} by {os.environ.get('LOGOS_SCRIPT_AUTHOR')}.")
     # BEGIN PREPARATION
     REGENERATE = os.environ.get('REGENERATE')
@@ -1535,126 +1546,63 @@ LOGOS_SCRIPT_TITLE = os.environ.get('LOGOS_SCRIPT_TITLE')
 LOGOS_SCRIPT_VERSION = os.environ.get('LOGOS_SCRIPT_VERSION')
 LOGOS_SCRIPT_AUTHOR = os.environ.get('LOGOS_SCRIPT_AUTHOR')
 
-# BEGIN OPTARGS
-RESET_OPTARGS = True
-args = sys.argv[1:]
-while args:
-    if RESET_OPTARGS:
-        RESET_OPTARGS = False
-        args = []
-    arg = args.pop(0)
-    if arg == "--help":
-        args.extend(["-h"])
-    elif arg == "--version":
-        args.extend(["-v"])
-    elif arg == "--verbose":
-        args.extend(["-V"])
-    elif arg == "--config":
-        args.extend(["-c"])
-    elif arg == "--skip-fonts":
-        args.extend(["-F"])
-    elif arg == "--regenerate-scripts":
-        args.extend(["-r"])
-    elif arg == "--force-root":
-        args.extend(["-f"])
-    elif arg == "--debug":
-        args.extend(["-D"])
-    elif arg == "--make-skel":
-        args.extend(["-k"])
-    elif arg == "--custom-binary-path":
-        args.extend(["-b"])
+def set_config_from_file(config_file):
+    if config_file and os.path.isfile(config_file):
+        os.environ["LOGOS_CONFIG"] = config_file
+        with open(config_file) as f:
+            code = compile(f.read(), config_file, 'exec')
+            exec(code, globals())
+    elif os.path.isfile(os.path.expanduser("~/.config/Logos_on_Linux/Logos_on_Linux.conf")):
+        os.environ["LOGOS_CONFIG"] = os.path.expanduser("~/.config/Logos_on_Linux/Logos_on_Linux.conf")
+        with open(os.environ["LOGOS_CONFIG"]) as f:
+            code = compile(f.read(), os.environ["LOGOS_CONFIG"], 'exec')
+            exec(code, globals())
     else:
-        args.append(arg)
-OPTSTRING = ":hvVcDfFrkb:"  # Available options
+        sys.stderr.write("No config file found.\n")
 
-# First loop: set variable options which may affect other options
-while args:
-    opt = args.pop(0)
-    if opt == "-c":
-        if args:
-            next_arg = args.pop(0)
-            if next_arg and not next_arg.startswith("-"):
-                if os.path.isfile(next_arg):
-                    LOGOS_CONFIG = next_arg
-                    os.environ["LOGOS_CONFIG"] = LOGOS_CONFIG
-                    with open(LOGOS_CONFIG) as f:
-                        code = compile(f.read(), LOGOS_CONFIG, 'exec')
-                        exec(code, globals())
-                else:
-                    sys.stderr.write(f"{LOGOS_SCRIPT_TITLE}: -c: Invalid config file path.\n")
-                    usage()
-                    sys.exit()
-            else:
-                if os.path.isfile(os.path.expanduser("~/.config/Logos_on_Linux/Logos_on_Linux.conf")):
-                    LOGOS_CONFIG = os.path.expanduser("~/.config/Logos_on_Linux/Logos_on_Linux.conf")
-                    os.environ["LOGOS_CONFIG"] = LOGOS_CONFIG
-                    with open(LOGOS_CONFIG) as f:
-                        code = compile(f.read(), LOGOS_CONFIG, 'exec')
-                        exec(code, globals())
-                else:
-                    sys.stderr.write("No config file found.\n")
-    elif opt == "-V":
+def parse_command_line():
+    parser = argparse.ArgumentParser(description='Installs ${FLPRODUCT} Bible Software with Wine on Linux.')
+    parser.add_argument('--version', '-v', action='version', version=f'{LOGOS_SCRIPT_TITLE}, {LOGOS_SCRIPT_VERSION} by {LOGOS_SCRIPT_AUTHOR}')
+    parser.add_argument('--config', '-c', metavar='CONFIG_FILE', help='Use the Logos on Linux config file when setting environment variables. Defaults to ~/.config/Logos_on_Linux/Logos_on_Linux.conf. Optionally can accept a config file provided by the user.')
+    parser.add_argument('--verbose', '-V', action='store_true', help='Enable verbose mode')
+    parser.add_argument('--skip-fonts', '-F', action='store_true', help='Skip font installations')
+    parser.add_argument('--force-root', '-f', action='store_true', help='Set LOGOS_FORCE_ROOT to true, which permits the root user to use the script.')
+    parser.add_argument('--regenerate-scripts', '-r', action='store_true', help='Regenerate the Logos.sh and controlPanel.sh scripts.')
+    parser.add_argument('--debug', '-D', action='store_true', help='Enable Wine debug output.')
+    parser.add_argument('--make-skel', '-k', action='store_true', help='Make a skeleton install only.')
+    parser.add_argument('--custom-binary-path', '-b', metavar='CUSTOMBINPATH', help='Specify a custom wine binary path.')
+
+    args = parser.parse_args()
+
+    if args.config:
+        set_config_from_file(args.config)
+
+    if args.verbose:
         os.environ["VERBOSE"] = "true"
-    elif opt == "-F":
+
+    if args.skip_fonts:
         os.environ["SKIP_FONTS"] = "1"
-    elif opt == "-f":
+
+    if args.force_root:
         os.environ["LOGOS_FORCE_ROOT"] = "1"
-    elif opt == "-r":
+
+    if args.regenerate_scripts:
         os.environ["REGENERATE"] = "1"
-    elif opt == "-D":
+
+    if args.debug:
         setDebug()
-    elif opt == "-k":
+
+    if args.make_skel:
         os.environ["SKEL"] = "1"
-    elif opt == "-b":
-        if args:
-            CUSTOMBINPATH = args.pop(0)
-            if os.path.isdir(CUSTOMBINPATH):
-                os.environ["CUSTOMBINPATH"] = CUSTOMBINPATH
-            else:
-                sys.stderr.write(f"{LOGOS_SCRIPT_TITLE}: User supplied path: \"{CUSTOMBINPATH}\". Custom binary path does not exist.\n")
-                usage()
-                sys.exit()
+
+    if args.custom_binary_path:
+        if os.path.isdir(args.custom_binary_path):
+            os.environ["CUSTOMBINPATH"] = args.custom_binary_path
         else:
-            sys.stderr.write(f"{LOGOS_SCRIPT_TITLE}: -b: missing argument.\n")
-            usage()
+            sys.stderr.write(f"{LOGOS_SCRIPT_TITLE}: User supplied path: \"{args.custom_binary_path}\". Custom binary path does not exist.\n")
+            parser.print_help()
             sys.exit()
-    elif opt == "-h":
-        usage()
-        sys.exit()
-    elif opt == "-v":
-        sys.stdout.write(f"{LOGOS_SCRIPT_TITLE}, {LOGOS_SCRIPT_VERSION} by {LOGOS_SCRIPT_AUTHOR}.\n")
-        sys.exit()
-    else:
-        sys.stderr.write(f"{LOGOS_SCRIPT_TITLE}: {opt}: undefined option.\n")
-        usage()
-        sys.exit()
 
-OPTIND = 1  # Reset the index.
-
-# Second loop: determine user action
-args = sys.argv[1:]
-while args:
-    opt = args.pop(0)
-    if opt == "-h":
-        usage()
-        sys.exit()
-    elif opt == "-v":
-        sys.stdout.write(f"{LOGOS_SCRIPT_TITLE}, {LOGOS_SCRIPT_VERSION} by {LOGOS_SCRIPT_AUTHOR}.\n")
-        sys.exit()
-    elif opt == "-?":
-        sys.stderr.write(f"{LOGOS_SCRIPT_TITLE}: {opt}: undefined option.\n")
-        usage()
-        sys.exit()
-    elif opt == ":":
-        sys.stderr.write(f"{LOGOS_SCRIPT_TITLE}: {opt}: missing argument.\n")
-        usage()
-        sys.exit()
-
-# If no options passed.
-if len(sys.argv) == 1:
-    pass
-
-args = sys.argv[1:]
 main()
 
 sys.exit(0)
