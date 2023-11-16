@@ -16,6 +16,7 @@ import requests
 from xml.etree import ElementTree as ET
 
 #TODO: Redo all GUI commands
+#TODO: Add getOS and package manager functions
 #TODO: Fix set_appimage()
 #TODO: Add a get_winetricks option to post-install menu?
 #TODO: Fix python print lines to use logos_error
