@@ -8,6 +8,7 @@ import datetime
 import time
 import tempfile
 import argparse
+import json
 import re
 import curses
 import textwrap
@@ -15,49 +16,80 @@ import requests
 from xml.etree import ElementTree as ET
 
 #TODO: Redo all GUI commands
+#TODO: Fix set_appimage()
+#TODO: Add a get_winetricks option to post-install menu?
 #TODO: Fix python print lines to use logos_error
-#TODO: Fix and test optargs
+#TODO: Test optargs
 #TODO: Redo logos_progress
 #TODO: Fix assigning of WINESERVER_EXE
 #TODO: Make optarg to add custom path to the wine binary paths.
 #TODO: Simplify variables? Import environment?
 
-# Environment variables
 os.environ["LOGOS_SCRIPT_TITLE"] = "Logos Linux Installer"
 os.environ["LOGOS_SCRIPT_AUTHOR"] = "Ferion11, John Goodman, T. H. Wright"
-os.environ["LOGOS_SCRIPT_VERSION"] = "3.7.5"
-os.environ["WINE64_APPIMAGE_FULL_VERSION"] = "v7.18-staging"
-os.environ["WINE64_APPIMAGE_FULL_URL"] = "https://github.com/ferion11/LogosLinuxInstaller/releases/download/wine-devel-8.19/wine-devel_8.19-x86_64.AppImage"
-os.environ["WINE64_APPIMAGE_FULL_FILENAME"] = os.path.basename(os.environ["WINE64_APPIMAGE_FULL_URL"])
-os.environ["WINE64_APPIMAGE_VERSION"] = "v7.18-staging"
-os.environ["WINE64_APPIMAGE_URL"] = "https://github.com/ferion11/LogosLinuxInstaller/releases/download/v10.0-1/wine-staging_7.18-x86_64.AppImage"
-os.environ["WINE64_BOTTLE_TARGZ_URL"] = "https://github.com/ferion11/wine64_bottle_dotnet/releases/download/v5.11b/wine64_bottle.tar.gz"
-os.environ["WINE64_BOTTLE_TARGZ_NAME"] = "wine64_bottle.tar.gz"
-os.environ["WINE64_APPIMAGE_FILENAME"] = os.path.basename(os.environ["WINE64_APPIMAGE_URL"]).split(".AppImage")[0]
-os.environ["APPIMAGE_LINK_SELECTION_NAME"] = "selected_wine.AppImage"
-os.environ["WINETRICKS_URL"] = "https://raw.githubusercontent.com/Winetricks/winetricks/5904ee355e37dff4a3ab37e1573c56cffe6ce223/src/winetricks"
-os.environ["LAUNCHER_TEMPLATE_URL"] = "https://raw.githubusercontent.com/ferion11/LogosLinuxInstaller/master/Launcher-Template.sh"
-os.environ["CONTROL_PANEL_TEMPLATE_URL"] = "https://raw.githubusercontent.com/ferion11/LogosLinuxInstaller/master/controlPanel-Template.sh"
-os.environ["WINETRICKS_DOWNLOADER"] = "wget"
-os.environ["WINETRICKS_UNATTENDED"] = ""
-os.environ["WORKDIR"] = tempfile.mkdtemp(prefix="/tmp/LBS.")
-os.environ["PRESENT_WORKING_DIRECTORY"] = os.getcwd()
-os.environ.setdefault("LOGOS_FORCE_ROOT", "")
-os.environ.setdefault("WINEBOOT_GUI", "")
-os.environ["EXTRA_INFO"] = "The following packages are usually necessary: winbind cabextract libjpeg8."
-os.environ.setdefault("DEFAULT_CONFIG_PATH", os.path.expanduser("~/.config/Logos_on_Linux/Logos_on_Linux.conf"))
-os.environ.setdefault("LOGOS_LOG", os.path.expanduser("~/.local/state/Logos_on_Linux/install.log"))
-os.makedirs(os.path.dirname(os.environ["LOGOS_LOG"]), exist_ok=True)
-open(os.environ["LOGOS_LOG"], "a").close()
-LOGOS_LOG = os.environ["LOGOS_LOG"]
-os.environ.setdefault("WINEDEBUG", "fixme-all,err-all")
-os.environ.setdefault("DEBUG", "FALSE")
-os.environ.setdefault("VERBOSE", "FALSE")
+os.environ["LOGOS_SCRIPT_VERSION"] = "4.0.0"
 
-def usage():
-    PDIF = '/tmp/LogosLinuxInstaller.pid'
-    with open(PIDF, 'r') as file:
-        print(file.read())
+# Environment variables
+def set_default_env():
+    os.environ["WINE64_APPIMAGE_FULL_VERSION"] = "v8.19-devel"
+    os.environ["WINE64_APPIMAGE_FULL_URL"] = "https://github.com/ferion11/LogosLinuxInstaller/releases/download/wine-devel-8.19/wine-devel_8.19-x86_64.AppImage"
+    os.environ["WINE64_APPIMAGE_FULL_FILENAME"] = os.path.basename(os.environ["WINE64_APPIMAGE_FULL_URL"])
+    os.environ["WINE64_APPIMAGE_VERSION"] = "v8.19-devel"
+    os.environ["WINE64_APPIMAGE_URL"] = "https://github.com/ferion11/LogosLinuxInstaller/releases/download/wine-devel-8.19/wine-devel_8.19-x86_64.AppImage"
+    os.environ["WINE64_BOTTLE_TARGZ_URL"] = "https://github.com/ferion11/wine64_bottle_dotnet/releases/download/v5.11b/wine64_bottle.tar.gz"
+    os.environ["WINE64_BOTTLE_TARGZ_NAME"] = "wine64_bottle.tar.gz"
+    os.environ["WINE64_APPIMAGE_FILENAME"] = os.path.basename(os.environ["WINE64_APPIMAGE_URL"]).split(".AppImage")[0]
+    os.environ["APPIMAGE_LINK_SELECTION_NAME"] = "selected_wine.AppImage"
+    os.environ["WINETRICKS_URL"] = "https://raw.githubusercontent.com/Winetricks/winetricks/5904ee355e37dff4a3ab37e1573c56cffe6ce223/src/winetricks"
+    os.environ["LAUNCHER_TEMPLATE_URL"] = "https://raw.githubusercontent.com/ferion11/LogosLinuxInstaller/master/Launcher-Template.sh"
+    os.environ["CONTROL_PANEL_TEMPLATE_URL"] = "https://raw.githubusercontent.com/ferion11/LogosLinuxInstaller/master/controlPanel-Template.sh"
+    os.environ["WINETRICKS_DOWNLOADER"] = "wget"
+    os.environ["WINETRICKS_UNATTENDED"] = ""
+    os.environ["WORKDIR"] = tempfile.mkdtemp(prefix="/tmp/LBS.")
+    os.environ["PRESENT_WORKING_DIRECTORY"] = os.getcwd()
+    os.environ.setdefault("LOGOS_FORCE_ROOT", "")
+    os.environ.setdefault("WINEBOOT_GUI", "")
+    os.environ["EXTRA_INFO"] = "The following packages are usually necessary: winbind cabextract libjpeg8."
+    os.environ.setdefault("DEFAULT_CONFIG_PATH", os.path.expanduser("~/.config/Logos_on_Linux/Logos_on_Linux.conf"))
+    os.environ.setdefault("LOGOS_LOG", os.path.expanduser("~/.local/state/Logos_on_Linux/install.log"))
+    os.makedirs(os.path.dirname(os.environ["LOGOS_LOG"]), exist_ok=True)
+    open(os.environ["LOGOS_LOG"], "a").close()
+    LOGOS_LOG = os.environ["LOGOS_LOG"]
+    os.environ.setdefault("WINEDEBUG", "fixme-all,err-all")
+    os.environ.setdefault("DEBUG", "FALSE")
+    os.environ.setdefault("VERBOSE", "FALSE")
+
+def get_config_env(config_file_path):
+    try:
+        with open(config_file_path, 'r') as config_file:
+            config = json.load(config_file)
+
+        for key, value in config.items():
+            os.environ[key] = str(value)
+
+        return config
+    except FileNotFoundError:
+        print(f"Error: Config file not found at {config_file_path}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"Error decoding config file {config_file_path}: {e}")
+        return None
+
+def write_config(config_file_path, config_keys=None):
+    os.makedirs(os.path.dirname(config_file_path), exist_ok=True)
+
+    config_keys = ["FLPRODUCT", "FLPRODUCTi", "TARGETVERSION", "INSTALLDIR", "APPDIR", "APPDIR_BINDIR", "WINETRICKSBIN", "WINEPREFIX", "WINEBIN_CODE", "WINE_EXE", "WINESERVER_EXE", "WINE64_APPIMAGE_FULL_URL", "WINE64_APPIMAGE_FULL_FILENAME", "APPIMAGE_LINK_SELECTION_NAME", "LOGOS_EXECUTABLE", "LOGOS_EXE", "LOGOS_DIR", "LOGS", "BACKUPDIR"]
+
+    config_data = {key: os.environ[key] for key in config_keys}
+
+    try:
+        with open(config_file_path, 'w') as config_file:
+            json.dump(config_data, config_file, indent=4)
+
+        return config_data
+    except IOError as e:
+        print(f"Error writing to config file {config_file_path}: {e}")
+        return None
 
 def die_if_running():
     PIDF = '/tmp/LogosLinuxInstaller.pid'
@@ -169,7 +201,6 @@ def getDialog():
 
     os.environ['DIALOG'] = DIALOG
     os.environ['GUI'] = str(GUI)
-    print("DIALOG = " + DIALOG)
 
 def have_dep(cmd):
     try:
@@ -1084,24 +1115,27 @@ def beginInstall():
         else:
             print(f"{wineserver_path} not found. Please either add it or create a symlink to it, and rerun.")
 
-def initializeWineBottle():
-    WINEPREFIX = os.environ.get('WINEPREFIX')
-    WINE_EXE = os.environ.get('WINE_EXE')
-    #logos_continue_question(f"Now the script will create and configure the Wine Bottle at {WINEPREFIX}. You can cancel the installation of Mono. Do you wish to continue?", f"The installation was cancelled!", "")
-    
+def run_wine_proc(winecmd, exe, flags):
     env = os.environ.copy()
+    WINEPREFIX = os.environ.get('WINEPREFIX')
+
+    if flags is not None or "":
+        command = [winecmd, exe, flags]
+    else:
+        command = [winecmd, exe]
 
     try:
-        process = subprocess.run([WINE_EXE, "wineboot"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, env={"WINEPREFIX": WINEPREFIX}, text=True)
+        process = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env={"WINEPREFIX": WINEPREFIX}, text=True)
 
         if process.returncode != 0:
-            print (f"Error 1 running wineboot: {return_code}")
-        else:
-            print(f"Finished running wineboot.")
+            print (f"Error 1 running {winecmd} {exe}: {return_code}")
 
     except subprocess.CalledProcessError as e:
-        print (f"Error 2 running wineboot: {e}")
+        print (f"Error 2 running {winecmd} {exe}: {e}")
 
+def initializeWineBottle():
+    #logos_continue_question(f"Now the script will create and configure the Wine Bottle at {WINEPREFIX}. You can cancel the installation of Mono. Do you wish to continue?", f"The installation was cancelled!", "")
+    run_wine_proc(wineboot)
     light_wineserver_wait()
 
 def wine_reg_install(REG_FILENAME):
@@ -1331,70 +1365,7 @@ def installLogos10():
     get_logos_executable()
     install_msi()
 
-def download_script_template(script_template):
-    PRESENT_WORKING_DIRECTORY = os.environ.get('PRESENT_WORKING_DIRECTORY')
-    WORKDIR = os.environ.get('WORKDIR')
-    HOME = os.environ.get('HOME')
-    if script_template == "Launcher-Template.sh":
-        SCRIPT_TEMPLATE_URL = os.environ.get('LAUNCHER_TEMPLATE_URL')
-    else:
-        SCRIPT_TEMPLATE_URL = os.environ.get('CONTROL_PANEL_TEMPLATE_URL')
-
-    verbose()
-    print(f"Downloading {SCRIPT_TEMPLATE_URL}…")
-
-    if os.path.isfile(os.path.join(PRESENT_WORKING_DIRECTORY, script_template)):
-        verbose()
-        print(f"{script_template} found. Using it…")
-        shutil.copy(os.path.join(PRESENT_WORKING_DIRECTORY, script_template), os.path.join(WORKDIR,  script_template))
-    elif os.path.isfile(os.path.join(HOME, 'Downloads',  script_template)):
-        verbose()
-        print(f"{ script_template} found in Downloads. Replacing it…")
-        os.remove(os.path.join(HOME, 'Downloads',  script_template))
-        logos_download(SCRIPT_TEMPLATE_URL, os.path.join(HOME, 'Downloads'))
-        shutil.copy(os.path.join(HOME, 'Downloads',  script_template), os.path.join(WORKDIR,  script_template))
-    else:
-        logos_download(SCRIPT_TEMPLATE_URL, os.path.join(HOME, 'Downloads'))
-        shutil.copy(os.path.join(HOME, 'Downloads',  script_template), os.path.join(WORKDIR,  script_template))
-
-def apply_shell_expansion(file_path):
-    with open(file_path, 'r') as file:
-        data = file.read()
-
-    delimiter = "__apply_shell_expansion_delimiter__"
-    command = f'cat <<{delimiter}\n{data}\n{delimiter}'
-    result = eval(command)
-    return result
-
-def create_script(script_name, launcher_name):
-    WORKDIR = os.environ.get('WORKDIR')
-    INSTALLDIR = os.environ.get('INSTALLDIR')
-    FLPRODUCT = os.environ.get('FLPRODUCT')
-    
-    download_script_template(f"{script_name}-Template.sh")
-    
-    input_path = os.path.join(WORKDIR, f"{script_name}-Template.sh")
-    output_path = os.path.join(WORKDIR, f"{launcher_name}.sh")
-    
-    with open(input_path, 'r') as file:
-        script_template = file.read()
-    
-    expanded_script = apply_shell_expansion(script_template)
-    
-    with open(output_path, "w") as file:
-        file.write(expanded_script)
-
-    os.chmod(output_path, 0o755)
-    shutil.move(output_path, INSTALLDIR)
-
-def create_starting_scripts():
-    FLPRODUCT = os.environ.get('FLPRODUCT')
-    if verbose:
-        print(f"Creating starting scripts for {FLPRODUCT}Bible 64 bits...")
-    create_script("Launcher", f"{FLPRODUCT}")
-    create_control_panel("controlPanel", "controlPanel")
-
-def createConfig():
+def create_config():
     HOME = os.environ.get('HOME')
     config_data = '''\
         # INSTALL OPTIONS
@@ -1459,9 +1430,58 @@ def postInstall():
     else:
         logos_error("Installation failed. {LOGOS_EXE} not found. Exiting…\nThe {FLPRODUCT} executable was not found. This means something went wrong while installing {FLPRODUCT}. Please contact the Logos on Linux community for help.", "")
 
-def main():
-    parse_command_line()
-    print(f"{os.environ.get('LOGOS_SCRIPT_TITLE')}, {os.environ.get('LOGOS_SCRIPT_VERSION')} by {os.environ.get('LOGOS_SCRIPT_AUTHOR')}.")
+def parse_command_line():
+    parser = argparse.ArgumentParser(description='Installs ${FLPRODUCT} Bible Software with Wine on Linux.')
+    parser.add_argument('--version', '-v', action='version', version=f'{os.environ.get("LOGOS_SCRIPT_TITLE")}, {os.environ.get("LOGOS_SCRIPT_VERSION")} by {os.environ.get("LOGOS_SCRIPT_AUTHOR")}')
+    parser.add_argument('--config', '-c', metavar='CONFIG_FILE', help='Use the Logos on Linux config file when setting environment variables. Defaults to ~/.config/Logos_on_Linux/Logos_on_Linux.conf. Optionally can accept a config file provided by the user.')
+    parser.add_argument('--verbose', '-V', action='store_true', help='Enable verbose mode')
+    parser.add_argument('--skip-fonts', '-F', action='store_true', help='Skip font installations')
+    parser.add_argument('--force-root', '-f', action='store_true', help='Set LOGOS_FORCE_ROOT to true, which permits the root user to use the script.')
+    parser.add_argument('--regenerate-scripts', '-r', action='store_true', help='Regenerate the Logos.sh and controlPanel.sh scripts.')
+    parser.add_argument('--debug', '-D', action='store_true', help='Enable Wine debug output.')
+    parser.add_argument('--make-skel', '-k', action='store_true', help='Make a skeleton install only.')
+    parser.add_argument('--custom-binary-path', '-b', metavar='CUSTOMBINPATH', help='Specify a custom wine binary path.')
+
+    args = parser.parse_args()
+
+    if args.config:
+        os.environ['CONFIG_FILE'] = CONFIG_FILE
+        get_config_env(CONFIG_FILE)
+
+    if args.verbose:
+        os.environ["VERBOSE"] = "true"
+
+    if args.skip_fonts:
+        os.environ["SKIP_FONTS"] = "1"
+
+    if args.force_root:
+        os.environ["LOGOS_FORCE_ROOT"] = "1"
+
+    if args.regenerate_scripts:
+        os.environ["REGENERATE"] = "1"
+
+    if args.debug:
+        setDebug()
+
+    if args.make_skel:
+        os.environ["SKEL"] = "1"
+
+    if args.custom_binary_path:
+        if os.path.isdir(args.custom_binary_path):
+            os.environ["CUSTOMBINPATH"] = args.custom_binary_path
+        else:
+            sys.stderr.write(f"{LOGOS_SCRIPT_TITLE}: User supplied path: \"{args.custom_binary_path}\". Custom binary path does not exist.\n")
+            parser.print_help()
+            sys.exit()
+
+def file_exists(file_path):
+    if file_path is not None:
+        expanded_path = os.path.expanduser(file_path)
+        return os.path.isfile(expanded_path)
+    else:
+        return False
+
+def install():
     # BEGIN PREPARATION
     REGENERATE = os.environ.get('REGENERATE')
     LOGOS_LOG = os.environ.get('LOGOS_LOG')
@@ -1529,80 +1549,97 @@ def main():
     with open(LOGOS_LOG, "a") as f:
         f.write(output)
 
-# END FUNCTION DECLARATIONS
+def run_logos():
+    env = os.environ.copy()
+    WINE_EXE = os.environ.get('WINE_EXE')
+    LOGOS_EXE = os.environ.get('LOGOS_EXE')
+    WINESERVER_EXE = os.environ.get('WINESERVER_EXE')
 
-# BEGIN SCRIPT EXECUTION
-if not os.environ.get("DIALOG"):
-    getDialog()
+    run_wine_proc(WINE_EXE, LOGOS_EXE)
+    run_wine_proc(WINESERVER_EXE, "-w")
+
+def set_appimage(newappimage):
+    WINE64_APPIMAGE_FULL_VERSION = os.environ["WINE64_APPIMAGE_FULL_VERSION"]
+    WINE64_APPIMAGE_FULL_URL = os.environ["WINE64_APPIMAGE_FULL_URL"]
+    WINE64_APPIMAGE_FULL_FILENAME = os.environ["WINE64_APPIMAGE_FULL_FILENAME"]
+    WINE64_APPIMAGE_VERSION = os.environ["WINE64_APPIMAGE_VERSION"]
+    WINE64_APPIMAGE_URL = os.environ["WINE64_APPIMAGE_URL"]
+    WINE64_APPIMAGE_FILENAME = os.environ["WINE64_APPIMAGE_FILENAME"]
+    APPIMAGE_LINK_SELECTION_NAME = os.environ["APPIMAGE_LINK_SELECTION_NAME"]
+    subprocess.run(["ln", "-s", SET_APPIMAGE_FILENAME, f"{APPDIR_BINDIR}/{APPIMAGE_LINK_SELECTION_NAME}"])
+
+def run_control_panel():
+    env = os.environ.copy()
+    WINE_EXE = os.environ.get('WINE_EXE')
+    WINESERVER_EXE = os.environ.get('WINESERVER_EXE')
+
+    run_wine_proc(WINE_EXE, "control")
+    run_wine_proc(WINESERVER_EXE, "-w")
+
+def run_winetricks():
+    env = os.environ.copy()
+    WINETRICKSBIN = os.environ.get('WINETRICKSBIN')
+    WINESERVER_EXE = os.environ.get('WINESERVER_EXE')
+
+    run_wine_proc(WINETRICKSBIN, "control")
+    run_wine_proc(WINESERVER_EXE, "-w")
+
+def main():
+    if not os.environ.get("DIALOG"):
+        getDialog()
+        
     if os.environ.get("GUI") == "true":
         with open(LOGOS_LOG, "a") as f:
             f.write("Running in a GUI. Enabling logging.\n")
         setDebug()
 
-die_if_running()
-die_if_root()
+    die_if_running()
+    die_if_root()
 
-LOGOS_SCRIPT_TITLE = os.environ.get('LOGOS_SCRIPT_TITLE')
-LOGOS_SCRIPT_VERSION = os.environ.get('LOGOS_SCRIPT_VERSION')
-LOGOS_SCRIPT_AUTHOR = os.environ.get('LOGOS_SCRIPT_AUTHOR')
+    parse_command_line()
 
-def set_config_from_file(config_file):
-    if config_file and os.path.isfile(config_file):
-        os.environ["LOGOS_CONFIG"] = config_file
-        with open(config_file) as f:
-            code = compile(f.read(), config_file, 'exec')
-            exec(code, globals())
-    elif os.path.isfile(os.path.expanduser("~/.config/Logos_on_Linux/Logos_on_Linux.conf")):
-        os.environ["LOGOS_CONFIG"] = os.path.expanduser("~/.config/Logos_on_Linux/Logos_on_Linux.conf")
-        with open(os.environ["LOGOS_CONFIG"]) as f:
-            code = compile(f.read(), os.environ["LOGOS_CONFIG"], 'exec')
-            exec(code, globals())
+    LOGOS_SCRIPT_TITLE = os.environ.get('LOGOS_SCRIPT_TITLE')
+    LOGOS_SCRIPT_VERSION = os.environ.get('LOGOS_SCRIPT_VERSION')
+    LOGOS_SCRIPT_AUTHOR = os.environ.get('LOGOS_SCRIPT_AUTHOR')
+
+    print(f"{os.environ.get('LOGOS_SCRIPT_TITLE')}, {os.environ.get('LOGOS_SCRIPT_VERSION')} by {os.environ.get('LOGOS_SCRIPT_AUTHOR')}.")
+    
+    CONFIG_FILE = os.environ.get('CONFIG_FILE')
+    options_default = ["Install Logos Bible Software"]
+    options_exit = ["Exit"]
+    if file_exists(CONFIG_FILE):
+        get_config_env(CONFIG_FILE)
+        options_installed = [f"Run {FLPRODUCT}", "Set AppImage", "Control Panel", "Run Winetricks"]
+        options = options_default + options_installed + options_exit
     else:
-        sys.stderr.write("No config file found.\n")
+        set_default_env()
+        options = options_default + options_exit
 
-def parse_command_line():
-    parser = argparse.ArgumentParser(description='Installs ${FLPRODUCT} Bible Software with Wine on Linux.')
-    parser.add_argument('--version', '-v', action='version', version=f'{LOGOS_SCRIPT_TITLE}, {LOGOS_SCRIPT_VERSION} by {LOGOS_SCRIPT_AUTHOR}')
-    parser.add_argument('--config', '-c', metavar='CONFIG_FILE', help='Use the Logos on Linux config file when setting environment variables. Defaults to ~/.config/Logos_on_Linux/Logos_on_Linux.conf. Optionally can accept a config file provided by the user.')
-    parser.add_argument('--verbose', '-V', action='store_true', help='Enable verbose mode')
-    parser.add_argument('--skip-fonts', '-F', action='store_true', help='Skip font installations')
-    parser.add_argument('--force-root', '-f', action='store_true', help='Set LOGOS_FORCE_ROOT to true, which permits the root user to use the script.')
-    parser.add_argument('--regenerate-scripts', '-r', action='store_true', help='Regenerate the Logos.sh and controlPanel.sh scripts.')
-    parser.add_argument('--debug', '-D', action='store_true', help='Enable Wine debug output.')
-    parser.add_argument('--make-skel', '-k', action='store_true', help='Make a skeleton install only.')
-    parser.add_argument('--custom-binary-path', '-b', metavar='CUSTOMBINPATH', help='Specify a custom wine binary path.')
+    if os.environ.get('DIALOG') in ['whiptail', 'dialog', 'curses']:
+        choice = curses_menu(options, "Welcome to Logos on Linux", "What would you like to do?")
+    elif DIALOG == "zenity":
+        gtk_info(message)
+        with open(LOGOS_LOG, "a") as file:
+            file.write(f"{datetime.now()} {message}\n")
+    elif DIALOG == "kdialog":
+        logos_error("kdialog not implemented.", "")
 
-    args = parser.parse_args()
-
-    if args.config:
-        set_config_from_file(args.config)
-
-    if args.verbose:
-        os.environ["VERBOSE"] = "true"
-
-    if args.skip_fonts:
-        os.environ["SKIP_FONTS"] = "1"
-
-    if args.force_root:
-        os.environ["LOGOS_FORCE_ROOT"] = "1"
-
-    if args.regenerate_scripts:
-        os.environ["REGENERATE"] = "1"
-
-    if args.debug:
-        setDebug()
-
-    if args.make_skel:
-        os.environ["SKEL"] = "1"
-
-    if args.custom_binary_path:
-        if os.path.isdir(args.custom_binary_path):
-            os.environ["CUSTOMBINPATH"] = args.custom_binary_path
-        else:
-            sys.stderr.write(f"{LOGOS_SCRIPT_TITLE}: User supplied path: \"{args.custom_binary_path}\". Custom binary path does not exist.\n")
-            parser.print_help()
-            sys.exit()
-
+    if "Install" in choice:
+        install()
+    elif f"Run {FLPRODUCT}" in choice:
+        run_logos()
+    elif "Set AppImage" in choice:
+        set_appimage()
+    elif "Control Panel" in choice:
+        run_control_panel()
+    elif "Run Winetricks" in choice:
+        run_winetricks()
+    elif "Exit" in choice:
+        sys.exit(0)
+    else:
+        logos_error("Unknown menu choice.", "")
+# END FUNCTION DECLARATIONS
+# BEGIN SCRIPT EXECUTION
 main()
 
 sys.exit(0)
