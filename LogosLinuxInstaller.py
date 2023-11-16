@@ -1537,6 +1537,41 @@ def set_appimage(newappimage):
     APPIMAGE_LINK_SELECTION_NAME = os.environ["APPIMAGE_LINK_SELECTION_NAME"]
     subprocess.run(["ln", "-s", SET_APPIMAGE_FILENAME, f"{APPDIR_BINDIR}/{APPIMAGE_LINK_SELECTION_NAME}"])
 
+def create_shortcut():
+    APPDIR = os.environ.get('APPDIR')
+    FLPRODUCT = os.environ.get('FLPRODUCT')
+    FLPRODUCTi = os.environ.get('FLPRODUCTi')
+    LOGOS_ICON_FILENAME = os.environ.get('LOGOS_ICON_FILENAME')
+
+    if not os.environ.get("LOGOS_ICON_URL"):
+        os.environ["LOGOS_ICON_URL"] = "https://raw.githubusercontent.com/ferion11/LogosLinuxInstaller/master/img/" + os.environ.get("FLPRODUCTi") + "-128-icon.png"
+
+    logos_icon_path = os.path.join(APPDIR, "data", LOGOS_ICON_FILENAME)
+
+    if not os.path.isfile(logos_icon_path):
+        os.makedirs(os.path.join(APPDIR, "data"), exist_ok=True)
+        response = requests.get(LOGOS_ICON_URL, stream=True)
+        if response.status_code == 200:
+            with open(logos_icon_path, 'wb') as f:
+                shutil.copyfileobj(response.raw, f)
+
+    desktop_entry_path = os.path.expanduser(f"~/.local/share/applications/{FLPRODUCT}Bible.desktop")
+    if os.path.exists(desktop_entry_path):
+        os.remove(desktop_entry_path)
+
+    with open(desktop_entry_path, 'w') as desktop_file:
+        desktop_file.write(f"""[Desktop Entry]
+Name={FLPRODUCT}Bible
+Comment=A Bible Study Library with Built-In Tools
+Exec={APPDIR}/Logos.sh
+Icon={logos_icon_path}
+Terminal=false
+Type=Application
+Categories=Education;
+"""
+
+    os.chmod(desktop_entry_path, 0o755)
+
 def run_control_panel():
     env = os.environ.copy()
     WINE_EXE = os.environ.get('WINE_EXE')
