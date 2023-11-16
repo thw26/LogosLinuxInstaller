@@ -19,6 +19,7 @@ from xml.etree import ElementTree as ET
 #TODO: Add getOS and package manager functions
 #TODO: Fix set_appimage()
 #TODO: Fix post-install
+#TODO: Verify necessary packages now that we are using python
 #TODO: Add a get_winetricks option to post-install menu?
 #TODO: Fix python print lines to use logos_error
 #TODO: Test optargs
