@@ -1410,6 +1410,14 @@ def parse_command_line():
     parser.add_argument('--debug', '-D', action='store_true', help='Enable Wine debug output.')
     parser.add_argument('--make-skel', '-k', action='store_true', help='Make a skeleton install only.')
     parser.add_argument('--custom-binary-path', '-b', metavar='CUSTOMBINPATH', help='Specify a custom wine binary path.')
+    parser.add_argument('--check-resources', '-R', action='store_true', help='Check resources and exit')
+    parser.add_argument('--edit-config', '-e', action='store_true', help='Edit configuration file')
+    parser.add_argument('--indexing', '-i', action='store_true', help='Perform indexing')
+    parser.add_argument('--backup', '-b', action='store_true', help='Perform backup')
+    parser.add_argument('--restore', '-r', action='store_true', help='Perform restore')
+    parser.add_argument('--logs', '-l', action='store_true', help='Enable/disable logs')
+    parser.add_argument('--dirlink', '-d', action='store_true', help='Create directory link')
+    parser.add_argument('--shortcut', '-s', action='store_true', help='Create shortcut')
 
     args = parser.parse_args()
 
@@ -1623,6 +1631,15 @@ Categories=Education;
 
     os.chmod(desktop_entry_path, 0o755)
 
+def edit_config():
+    pass
+
+def backup():
+    pass
+
+def restore():
+    pass
+
 def run_control_panel():
     env = os.environ.copy()
     WINE_EXE = os.environ.get('WINE_EXE')
@@ -1684,7 +1701,7 @@ def main():
     options_exit = ["Exit"]
     if file_exists(CONFIG_FILE):
         get_config_env(CONFIG_FILE)
-        options_installed = [f"Run {FLPRODUCT}", "Run Indexing", "Remove Library Catalog", "Remove All Index Files", "Set AppImage", "Control Panel", "Run Winetricks"]
+        options_installed = [f"Run {FLPRODUCT}", "Run Indexing", "Remove Library Catalog", "Remove All Index Files", "Edit Config", "Back up Data", "Restore Data", "Set AppImage", "Control Panel", "Run Winetricks"]
         if os.environ["LOGS"] == "DISABLED":
             options_installed.extend("Enable Logging")
         else:
@@ -1713,6 +1730,12 @@ def main():
         remove_library_catalog()
     elif "Remove All Index Files" in choice:
         remove_all_index_files()
+    elif "Edit Config" in choice:
+        edit_config()
+    elif "Back up Data" in choice:
+        backup()
+    elif "Restore Data" in choice:
+        restore()
     elif "Set AppImage" in choice:
         set_appimage()
     elif "Control Panel" in choice:
