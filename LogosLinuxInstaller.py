@@ -1527,6 +1527,57 @@ def run_logos():
     run_wine_proc(WINE_EXE, LOGOS_EXE)
     run_wine_proc(WINESERVER_EXE, "-w")
 
+def run_indexing():
+    WINEPREFIX = os.environ.get('WINEPREFIX')
+    WINE_EXE = os.environ.get('WINE_EXE')
+    WINESERVER_EXE = os.environ.get('WINESERVER_EXE')
+
+    for root, dirs, files in os.walk(os.path.join(wineprefix, "drive_c")):
+        for file in files:
+            if file == "LogosIndexer.exe" and root.endswith("Logos/System"):
+                logos_indexer_exe = os.path.join(root, file)
+                break
+
+    run_wine_proc(WINESERVER_EXE, "-k")
+    run_wine_proc(WINE_EXE, logos_indexer_exe)
+    run_wine_proc(WINESERVER_EXE, "-w")
+
+def remove_library_catalog():
+    LOGOS_EXE = os.environ.get('LOGOS_EXE')
+    LOGOS_DIR = os.path.dirname(LOGO_EXE)
+    library_catalog_path = os.path.join(LOGOS_DIR, "Data", "*", "LibraryCatalog")
+    pattern = os.path.join(library_catalog_path, "*")
+    files_to_remove = glob.glob(pattern)
+    for file_to_remove in files_to_remove:
+        try:
+            os.remove(file_to_remove)
+            print(f"Removed: {file_to_remove}")
+        except OSError as e:
+            print(f"Error removing {file_to_remove}: {e}")
+
+def remove_all_index_files():
+    LOGOS_EXE = os.environ.get('LOGOS_EXE')
+    LOGOS_DIR = os.path.dirname(LOGO_EXE)
+    index_paths = [
+        os.path.join(logos_dir, "Data", "*", "BibleIndex"),
+        os.path.join(logos_dir, "Data", "*", "LibraryIndex"),
+        os.path.join(logos_dir, "Data", "*", "PersonalBookIndex"),
+        os.path.join(logos_dir, "Data", "*", "LibraryCatalog")
+    ]
+    for index_path in index_paths:
+        pattern = os.path.join(index_path, "*")
+        files_to_remove = glob.glob(pattern)
+
+        for file_to_remove in files_to_remove:
+            try:
+                os.remove(file_to_remove)
+                print(f"Removed: {file_to_remove}")
+            except OSError as e:
+                print(f"Error removing {file_to_remove}: {e}")
+
+    print("======= Removing all LogosBible index files done! =======")
+    exit(0)
+
 def set_appimage(newappimage):
     WINE64_APPIMAGE_FULL_VERSION = os.environ["WINE64_APPIMAGE_FULL_VERSION"]
     WINE64_APPIMAGE_FULL_URL = os.environ["WINE64_APPIMAGE_FULL_URL"]
@@ -1633,7 +1684,7 @@ def main():
     options_exit = ["Exit"]
     if file_exists(CONFIG_FILE):
         get_config_env(CONFIG_FILE)
-        options_installed = [f"Run {FLPRODUCT}", "Set AppImage", "Control Panel", "Run Winetricks"]
+        options_installed = [f"Run {FLPRODUCT}", "Run Indexing", "Remove Library Catalog", "Remove All Index Files", "Set AppImage", "Control Panel", "Run Winetricks"]
         if os.environ["LOGS"] == "DISABLED":
             options_installed.extend("Enable Logging")
         else:
@@ -1656,6 +1707,12 @@ def main():
         install()
     elif f"Run {FLPRODUCT}" in choice:
         run_logos()
+    elif "Run Indexing" in choice:
+        run_indexing()
+    elif "Remove Library Catalog" in choice:
+        remove_library_catalog()
+    elif "Remove All Index Files" in choice:
+        remove_all_index_files()
     elif "Set AppImage" in choice:
         set_appimage()
     elif "Control Panel" in choice:
