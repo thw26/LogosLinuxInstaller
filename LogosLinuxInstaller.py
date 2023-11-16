@@ -78,8 +78,6 @@ def get_config_env(config_file_path):
 def write_config(config_file_path, config_keys=None):
     os.makedirs(os.path.dirname(config_file_path), exist_ok=True)
 
-    config_keys = ["FLPRODUCT", "FLPRODUCTi", "TARGETVERSION", "INSTALLDIR", "APPDIR", "APPDIR_BINDIR", "WINETRICKSBIN", "WINEPREFIX", "WINEBIN_CODE", "WINE_EXE", "WINESERVER_EXE", "WINE64_APPIMAGE_FULL_URL", "WINE64_APPIMAGE_FULL_FILENAME", "APPIMAGE_LINK_SELECTION_NAME", "LOGOS_EXECUTABLE", "LOGOS_EXE", "LOGOS_DIR", "LOGS", "BACKUPDIR"]
-
     config_data = {key: os.environ[key] for key in config_keys}
 
     try:
@@ -1365,55 +1363,26 @@ def installLogos10():
     get_logos_executable()
     install_msi()
 
-def create_config():
-    HOME = os.environ.get('HOME')
-    config_data = '''\
-        # INSTALL OPTIONS
-        FLPRODUCT="{FLPRODUCT}"
-        FLPRODUCTi="{FLPRODUCTi}"
-        TARGETVERSION="{TARGETVERSION}"
-        INSTALLDIR="{INSTALLDIR}"
-        APPDIR="{APPDIR}"
-        APPDIR_BINDIR="{APPDIR_BINDIR}"
-        WINETRICKSBIN="{WINETRICKSBIN}"
-        WINEPREFIX="{WINEPREFIX}"
-        WINEBIN_CODE="{WINEBIN_CODE}"
-        WINE_EXE="{WINE_EXE}"
-        WINESERVER_EXE="{WINESERVER_EXE}"
-        WINE64_APPIMAGE_FULL_URL="{WINE64_APPIMAGE_FULL_URL}"
-        WINE64_APPIMAGE_FULL_FILENAME="{WINE64_APPIMAGE_FULL_FILENAME}"
-        APPIMAGE_LINK_SELECTION_NAME="{APPIMAGE_LINK_SELECTION_NAME}"
-        LOGOS_EXECUTABLE="{LOGOS_EXECUTABLE}"
-        LOGOS_EXE="{LOGOS_EXE}"
-        LOGOS_DIR="{LOGOS_DIR}"
-
-        # RUN OPTIONS
-        LOGS="DISABLED"
-
-        # RESTORE OPTIONS
-        BACKUPDIR=""
-    '''
-    with open(f"{HOME}/.config/Logos_on_Linux/Logos_on_Linux.conf", "w") as config_file:
-        config_file.write(config_data)
-
 def postInstall():
     LOGOS_EXE = os.environ.get('LOGOS_EXE')
     FLPRODUCT = os.environ.get('FLPRODUCT')
     TARGETVERSION = os.environ.get('TARGETVERSION')
-    LOGOS_CONFIG = os.environ.get('LOGOS_CONFIG')
+    CONFIG_FILE = os.environ.get('CONFIG_FILE')
     DEFAULT_CONFIG_PATH = os.environ.get('DEFAULT_CONFIG_PATH')
     INSTALLDIR = os.environ.get('INSTALLDIR')
     HOME = os.environ.get('HOME')
+    config_keys = ["FLPRODUCT", "FLPRODUCTi", "TARGETVERSION", "INSTALLDIR", "APPDIR", "APPDIR_BINDIR", "WINETRICKSBIN", "WINEPREFIX", "WINEBIN_CODE", "WINE_EXE", "WINESERVER_EXE", "WINE64_APPIMAGE_FULL_URL", "WINE64_APPIMAGE_FULL_FILENAME", "APPIMAGE_LINK_SELECTION_NAME", "LOGOS_EXECUTABLE", "LOGOS_EXE", "LOGOS_DIR", "LOGS", "BACKUPDIR"]
+
     if os.path.isfile(LOGOS_EXE):
         logos_info(f"{FLPRODUCT} Bible {TARGETVERSION} installed!")
-        if not LOGOS_CONFIG and not os.path.isfile(DEFAULT_CONFIG_PATH):
+        if not CONFIG_FILE and not os.path.isfile(DEFAULT_CONFIG_PATH):
             os.makedirs(os.path.join(HOME, ".config", "Logos_on_Linux"), exist_ok=True)
             if os.path.isdir(os.path.join(HOME, ".config", "Logos_on_Linux")):
-                createConfig()
+                write_config(CONFIG_FILE, config_keys)
                 logos_info(f"A config file was created at {DEFAULT_CONFIG_PATH}.")
             else:
                 logos_warn(f"{HOME}/.config/Logos_on_Linux does not exist. Failed to create config file.")
-        elif not LOGOS_CONFIG and os.path.isfile(DEFAULT_CONFIG_PATH):
+        elif not CONFIG_FILE and os.path.isfile(DEFAULT_CONFIG_PATH):
             if logos_acknowledge_question(f"The script found a config file at {DEFAULT_CONFIG_PATH}. Should the script overwrite the existing config?", "The existing config file was not overwritten."):
                 if os.path.isdir(os.path.join(HOME, ".config", "Logos_on_Linux")):
                     createConfig()
@@ -1584,6 +1553,26 @@ def run_winetricks():
     run_wine_proc(WINETRICKSBIN, "control")
     run_wine_proc(WINESERVER_EXE, "-w")
 
+def disable_logging():
+    CONFIG_FILE = os.environ.get('CONFIG_FILE')
+    WINEPREFIX = os.environ.get('WINEPREFIX')
+    WINE_EXE = os.environ.get('WINE_EXE')
+    subprocess.run([WINE_EXE, 'reg', 'add', 'HKCU\\Software\\Logos4\\Logging', '/v', 'Enabled', '/t', 'REG_DWORD', '/d', '0001', '/f'], env={"WINEPREFIX": WINEPREFIX})
+    subprocess.run([wineserver_exe, '-w'])
+
+    for line in fileinput.input(CONFIG_FILE, inplace=True):
+        print(line.replace('LOGS="ENABLED"', 'LOGS="DISABLED"'), end='')
+
+def enable_logging():
+    CONFIG_FILE = os.environ.get('CONFIG_FILE')
+    WINEPREFIX = os.environ.get('WINEPREFIX')
+    WINE_EXE = os.environ.get('WINE_EXE')
+    subprocess.run([WINE_EXE, 'reg', 'add', 'HKCU\\Software\\Logos4\\Logging', '/v', 'Disabled', '/t', 'REG_DWORD', '/d', '0000', '/f'], env={"WINEPREFIX": WINEPREFIX})
+    subprocess.run([wineserver_exe, '-w'])
+
+    for line in fileinput.input(CONFIG_FILE, inplace=True):
+        print(line.replace('LOGS="DISABLED"', 'LOGS="ENABLED"'), end='')
+
 def main():
     if not os.environ.get("DIALOG"):
         getDialog()
@@ -1610,6 +1599,10 @@ def main():
     if file_exists(CONFIG_FILE):
         get_config_env(CONFIG_FILE)
         options_installed = [f"Run {FLPRODUCT}", "Set AppImage", "Control Panel", "Run Winetricks"]
+        if os.environ["LOGS"] == "DISABLED":
+            options_installed.extend("Enable Logging")
+        else:
+            options_installed.extend("Disable Logging")
         options = options_default + options_installed + options_exit
     else:
         set_default_env()
@@ -1634,6 +1627,11 @@ def main():
         run_control_panel()
     elif "Run Winetricks" in choice:
         run_winetricks()
+    elif "Logging" in choice:
+        if os.environ["LOGS"] == "DISABLED":
+            enable_logging()
+        else:
+            disable_logging()
     elif "Exit" in choice:
         sys.exit(0)
     else:
