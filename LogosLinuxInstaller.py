@@ -22,8 +22,6 @@ from xml.etree import ElementTree as ET
 #TODO: Fix python print lines to use logos_error
 #TODO: Test optargs
 #TODO: Redo logos_progress
-#TODO: Fix assigning of WINESERVER_EXE
-#TODO: Make optarg to add custom path to the wine binary paths.
 #TODO: Simplify variables? Import environment?
 
 os.environ["LOGOS_SCRIPT_TITLE"] = "Logos Linux Installer"
