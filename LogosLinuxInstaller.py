@@ -18,6 +18,7 @@ from xml.etree import ElementTree as ET
 #TODO: Redo all GUI commands
 #TODO: Add getOS and package manager functions
 #TODO: Fix set_appimage()
+#TODO: Fix post-install
 #TODO: Add a get_winetricks option to post-install menu?
 #TODO: Fix python print lines to use logos_error
 #TODO: Test optargs
@@ -1384,7 +1385,7 @@ def postInstall():
         elif not CONFIG_FILE and os.path.isfile(DEFAULT_CONFIG_PATH):
             if logos_acknowledge_question(f"The script found a config file at {DEFAULT_CONFIG_PATH}. Should the script overwrite the existing config?", "The existing config file was not overwritten."):
                 if os.path.isdir(os.path.join(HOME, ".config", "Logos_on_Linux")):
-                    createConfig()
+                    write_config(CONFIG_FILE, config_keys)
                 else:
                     logos_warn(f"{HOME}/.config/Logos_on_Linux does not exist. Failed to create config file.")
         else:
