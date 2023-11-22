@@ -10,11 +10,13 @@ import tempfile
 import argparse
 import json
 import re
+import platform # Deprecated in Python 3.8+
 import curses
 import textwrap
 import requests
 from xml.etree import ElementTree as ET
 
+#TODO: Put main menu into a while loop
 #TODO: Redo all GUI commands
 #TODO: Add getOS and package manager functions
 #TODO: Fix set_appimage()
@@ -200,6 +202,56 @@ def getDialog():
 
     os.environ['DIALOG'] = DIALOG
     os.environ['GUI'] = str(GUI)
+
+def getOS():
+def get_os():
+    # Try reading /etc/os-release
+    try:
+        with open('/etc/os-release', 'r') as f:
+            os_release_content = f.read()
+        match = re.search(r'^ID=(\S+).*?VERSION_ID=(\S+)', os_release_content, re.MULTILINE)
+        if match:
+            os_name = match.group(1)
+            os_release = match.group(2)
+            return os_name, os_release
+    except FileNotFoundError:
+        pass
+
+    # Try using lsb_release command
+    try:
+        os_name = platform.linux_distribution()[0]
+        os_release = platform.linux_distribution()[1]
+        return os_name, os_release
+    except AttributeError:
+        pass
+
+    # Try reading /etc/lsb-release
+    try:
+        with open('/etc/lsb-release', 'r') as f:
+            lsb_release_content = f.read()
+        match = re.search(r'^DISTRIB_ID=(\S+).*?DISTRIB_RELEASE=(\S+)', lsb_release_content, re.MULTILINE)
+        if match:
+            os_name = match.group(1)
+            os_release = match.group(2)
+            return os_name, os_release
+    except FileNotFoundError:
+        pass
+
+    # Try reading /etc/debian_version
+    try:
+        with open('/etc/debian_version', 'r') as f:
+            os_name = 'Debian'
+            os_release = f.read().strip()
+            return os_name, os_release
+    except FileNotFoundError:
+        pass
+
+    # Add more conditions for other distributions as needed
+
+    # Fallback to platform module
+    os_name = platform.system()
+    os_release = platform.release()
+    return os_name, os_release
 
 def have_dep(cmd):
     try:
@@ -1689,6 +1741,8 @@ def main():
     die_if_running()
     die_if_root()
 
+    os_name, os_release = get_os()
+
     parse_command_line()
 
     LOGOS_SCRIPT_TITLE = os.environ.get('LOGOS_SCRIPT_TITLE')
@@ -1696,7 +1750,7 @@ def main():
     LOGOS_SCRIPT_AUTHOR = os.environ.get('LOGOS_SCRIPT_AUTHOR')
 
     print(f"{os.environ.get('LOGOS_SCRIPT_TITLE')}, {os.environ.get('LOGOS_SCRIPT_VERSION')} by {os.environ.get('LOGOS_SCRIPT_AUTHOR')}.")
-    
+
     CONFIG_FILE = os.environ.get('CONFIG_FILE')
     options_default = ["Install Logos Bible Software"]
     options_exit = ["Exit"]
