@@ -16,19 +16,24 @@ import textwrap
 import requests
 from xml.etree import ElementTree as ET
 
-#TODO: Put main menu into a while loop
-#TODO: Redo all GUI commands
+# Basic Functionality
+#TODO: Fix post-install
 #TODO: Test get_os and get_package_manager
-#TODO: Convert checkAppImages()
+#TODO: Verify necessary packages now that we are using python
+#TODO: Redo logos_progress
+#TODO: Redo all GUI commands
+#TODO: Fix python print lines to use logos_error
+#TODO: Test optargs and menu options
+
+# AppImage Handling
+#TODO: Convert checkAppImages(). See https://github.com/ferion11/LogosLinuxInstaller/pull/193/commits/bfefb3c05c7a9989e81372d77fa785fc75bd4e94
 #TODO: Fix set_appimage()
 #TODO: Add update_appimage()
-#TODO: Fix post-install
-#TODO: Verify necessary packages now that we are using python
+
+# Script updates and ideas
+#TODO: Put main menu into a while loop
 #TODO: Add an option to reinstall dependencies for SteamOS
 #TODO: Add a get_winetricks option to post-install menu
-#TODO: Fix python print lines to use logos_error
-#TODO: Test optargs
-#TODO: Redo logos_progress
 #TODO: Simplify variables? Import environment?
 
 os.environ["LOGOS_SCRIPT_TITLE"] = "Logos Linux Installer"
