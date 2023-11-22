@@ -203,7 +203,6 @@ def getDialog():
     os.environ['DIALOG'] = DIALOG
     os.environ['GUI'] = str(GUI)
 
-def getOS():
 def get_os():
     # Try reading /etc/os-release
     try:
@@ -252,6 +251,41 @@ def get_os():
     os_name = platform.system()
     os_release = platform.release()
     return os_name, os_release
+
+def get_package_manager():
+    superuser_command = None
+    package_manager_command = None
+    packages = None
+
+    # Check for superuser command
+    if subprocess.run(["command", "-v", "sudo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
+        superuser_command = "sudo"
+    elif subprocess.run(["command", "-v", "doas"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
+        superuser_command = "doas"
+
+    # Check for package manager and associated packages
+    if subprocess.run(["command", "-v", "apt"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
+        package_manager_command = "apt install -y"
+        packages = "mktemp patch lsof wget find sed grep gawk tr winbind cabextract x11-apps bc libxml2-utils curl fuse3"
+    elif subprocess.run(["command", "-v", "dnf"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
+        package_manager_command = "dnf install -y"
+        packages = "patch mod_auth_ntlm_winbind samba-winbind cabextract bc libxml2 curl"
+    elif subprocess.run(["command", "-v", "yum"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
+        package_manager_command = "yum install -y"
+        packages = "patch mod_auth_ntlm_winbind samba-winbind cabextract bc libxml2 curl"
+    elif subprocess.run(["command", "-v", "pamac"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
+        package_manager_command = "pamac install --no-upgrade --no-confirm"
+        packages = "patch lsof wget sed grep gawk cabextract samba bc libxml2 curl"
+    elif subprocess.run(["command", "-v", "pacman"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
+        package_manager_command = 'pacman -Syu --overwrite \* --noconfirm --needed'
+        packages = "patch lsof wget sed grep gawk cabextract samba bc libxml2 curl print-manager system-config-printer cups-filters nss-mdns foomatic-db-engine foomatic-db-ppds foomatic-db-nonfree-ppds ghostscript glibc samba extra-rel/apparmor core-rel/libcurl-gnutls winetricks cabextract appmenu-gtk-module patch bc lib32-libjpeg-turbo qt5-virtualkeyboard wine-staging giflib lib32-giflib libpng lib32-libpng libldap lib32-libldap gnutls lib32-gnutls mpg123 lib32-mpg123 openal lib32-openal v4l-utils lib32-v4l-utils libpulse lib32-libpulse libgpg-error lib32-libgpg-error alsa-plugins lib32-alsa-plugins alsa-lib lib32-alsa-lib libjpeg-turbo lib32-libjpeg-turbo sqlite lib32-sqlite libxcomposite lib32-libxcomposite libxinerama lib32-libgcrypt libgcrypt lib32-libxinerama ncurses lib32-ncurses ocl-icd lib32-ocl-icd libxslt lib32-libxslt libva lib32-libva gtk3 lib32-gtk3 gst-plugins-base-libs lib32-gst-plugins-base-libs vulkan-icd-loader lib32-vulkan-icd-loader"
+    # Add more conditions for other package managers as needed
+
+    return superuser_command, package_manager_command, packages
+
+def install_packages(superuser_command, package_manager_command, *packages):
+    command = [superuser_command, package_manager_command] + list(packages)
+    subprocess.run(command, check=True)
 
 def have_dep(cmd):
     try:
@@ -743,36 +777,56 @@ def make_skel(app_image_filename):
     verbose()
     print("skel64 done!")
 
-def check_commands(*cmds):
-    EXTRA_INFO = os.environ.get('EXTRA_INFO')
-    MISSING_CMD = []
-    for cmd in cmds:
+def check_commands(superuser_command, package_manager_command, os_name, missing_commands, packages, extra_info):
+    missing_cmd = []
+    for cmd in missing_commands:
         if have_dep(cmd):
-            if verbose:
-                print(f"* command {cmd} is installed!")
+            print(f"* Command {cmd} is installed!")
         else:
-            if verbose:
-                print(f"* command {cmd} not installed!")
-            MISSING_CMD.append(cmd)
-    
-    if len(MISSING_CMD) != 0:
-        logos_error(f"Your system is missing {' '.join(MISSING_CMD)}. Please install your distro's {' '.join(MISSING_CMD)} package(s).\n {EXTRA_INFO}", "")
+            print(f"* Command {cmd} not installed!")
+            missing_cmd.append(cmd)
 
-def have_lib(lib):
+    if missing_cmd:
+        if package_manager_command:
+            message = f"Your {os_name} install is missing the command(s): {missing_cmd}. To continue, the script will attempt to install the package(s): {packages} by using ({package_manager_command}). Proceed?"
+            if os_name == "Steam":
+                subprocess.run([superuser_command, "steamos-readonly", "disable"], check=True)
+                subprocess.run([superuser_command, "pacman-key", "--init"], check=True)
+                subprocess.run([superuser_command, "pacman-key", "--populate", "archlinux"], check=True)
+
+            if logos_continue_question(message, extra_info):
+                install_packages(superuser_command, package_manager_command, packages)
+
+                if os_name == "Steam":
+                    subprocess.run([superuser_command, "sed", '-i', 's/mymachines resolve/mymachines mdns_minimal [NOTFOUND=return] resolve/', '/etc/nsswitch.conf'], check=True)
+                    subprocess.run([superuser_command, "locale-gen"], check=True)
+                    subprocess.run([superuser_command, "systemctl", "enable", "--now", "avahi-daemon"], check=True)
+                    subprocess.run([superuser_command, "systemctl", "enable", "--now", "cups"], check=True)
+                    subprocess.run([superuser_command, "steamos-readonly", "enable"], check=True)
+        else:
+            logos_error(f"The script could not determine your {os_name} install's package manager or it is unsupported. Your computer is missing the command(s) {missing_cmd}. Please install your distro's package(s) associated with {missing_cmd} for {os_name}.\n{extra_info}")
+
+def have_lib(library, ld_library_path):
+    ldconfig_cmd = ["ldconfig", "-N", "-v", ":".join(ld_library_path.split(':'))]
     try:
-        subprocess.check_output(["ldconfig", "-N", "-v"]).decode('utf-8').count(lib)
-        return True
-    except FileNotFoundError:
+        result = subprocess.run(ldconfig_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True)
+        return library in result.stdout
+    except subprocess.CalledProcessError:
         return False
 
-def check_libs(*libs):
-    EXTRA_INFO = os.environ.get('EXTRA_INFO')
-    for lib in libs:
-        if have_lib(lib):
-            verbose()
-            print(f"* {lib} is installed!")
+def check_libs(superuser_command, package_manager_command, libraries, packages):
+    ld_library_path = os.environ.get('LD_LIBRARY_PATH')
+    for library in libraries:
+        have_lib_result = have_lib(library, ld_library_path)
+        if have_lib_result:
+            print(f"* {library} is installed!")
         else:
-            logos_error(f"Your system does not have lib: {lib}. Please install {lib} package.\n {EXTRA_INFO}", "")
+            if package_manager_command:
+                message = f"Your {os_name} install is missing the library: {library}. To continue, the script will attempt to install the library by using {package_manager_command}. Proceed?"
+                if logos_continue_question(message, extra_info):
+                    install_packages(superuser_command, package_manager_command, packages)
+            else:
+                logos_error(f"The script could not determine your {os_name} install's package manager or it is unsupported. Your computer is missing the library: {library}. Please install the package associated with {library} for {os_name}.\n{extra_info}")
 
 def checkDependencies():
     verbose()
@@ -1742,6 +1796,8 @@ def main():
     die_if_root()
 
     os_name, os_release = get_os()
+
+    superuser_command, package_manager_command, packages = get_package_manager()
 
     parse_command_line()
 
