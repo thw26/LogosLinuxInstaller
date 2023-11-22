@@ -18,11 +18,14 @@ from xml.etree import ElementTree as ET
 
 #TODO: Put main menu into a while loop
 #TODO: Redo all GUI commands
-#TODO: Add getOS and package manager functions
+#TODO: Test get_os and get_package_manager
+#TODO: Convert checkAppImages()
 #TODO: Fix set_appimage()
+#TODO: Add update_appimage()
 #TODO: Fix post-install
 #TODO: Verify necessary packages now that we are using python
-#TODO: Add a get_winetricks option to post-install menu?
+#TODO: Add an option to reinstall dependencies for SteamOS
+#TODO: Add a get_winetricks option to post-install menu
 #TODO: Fix python print lines to use logos_error
 #TODO: Test optargs
 #TODO: Redo logos_progress
@@ -50,6 +53,7 @@ def set_default_env():
     os.environ["WINETRICKS_UNATTENDED"] = ""
     os.environ["WORKDIR"] = tempfile.mkdtemp(prefix="/tmp/LBS.")
     os.environ["PRESENT_WORKING_DIRECTORY"] = os.getcwd()
+    os.environ["MYDOWNLOADS"] = os.path.expanduser("~/Downloads")
     os.environ.setdefault("LOGOS_FORCE_ROOT", "")
     os.environ.setdefault("WINEBOOT_GUI", "")
     os.environ["EXTRA_INFO"] = "The following packages are usually necessary: winbind cabextract libjpeg8."
@@ -948,7 +952,8 @@ def chooseVersion():
             no_diag_msg("No dialog tool found.")
     else:
         versionChoice = TARGETVERSION
-    
+   
+    checkDependencies()
     if "10" in versionChoice:
         checkDependenciesLogos10()
         os.environ["TARGETVERSION"] = TARGETVERSION = "10"
@@ -960,6 +965,7 @@ def chooseVersion():
     else:
         logos_error("Unknown version. Installation canceled!", "")
 
+logos_setup():
     getLogosReleaseVersion(TARGETVERSION)
 
     global LOGOS_RELEASE_VERSION
@@ -1047,7 +1053,7 @@ def createWineBinaryList():
         "/usr/local/bin",
         os.path.expanduser("~") + "/bin",
         os.path.expanduser("~") + "/PlayOnLinux/wine/linux-amd64/*/bin",
-        os.path.expanduser("~") + "/.steam/steam/steamapps/common/Proton - Experimental/files/bin",
+        os.path.expanduser("~") + "/.steam/steam/steamapps/common/Proton*/files/bin",
         CUSTOMBINPATH
     ]
 
@@ -1507,12 +1513,13 @@ def postInstall():
         logos_error("Installation failed. {LOGOS_EXE} not found. Exiting…\nThe {FLPRODUCT} executable was not found. This means something went wrong while installing {FLPRODUCT}. Please contact the Logos on Linux community for help.", "")
 
 def parse_command_line():
-    parser = argparse.ArgumentParser(description='Installs ${FLPRODUCT} Bible Software with Wine on Linux.')
+    parser = argparse.ArgumentParser(description=f'Installs os.environ.get('FLPRODUCT') Bible Software with Wine on Linux.')
     parser.add_argument('--version', '-v', action='version', version=f'{os.environ.get("LOGOS_SCRIPT_TITLE")}, {os.environ.get("LOGOS_SCRIPT_VERSION")} by {os.environ.get("LOGOS_SCRIPT_AUTHOR")}')
     parser.add_argument('--config', '-c', metavar='CONFIG_FILE', help='Use the Logos on Linux config file when setting environment variables. Defaults to ~/.config/Logos_on_Linux/Logos_on_Linux.conf. Optionally can accept a config file provided by the user.')
     parser.add_argument('--verbose', '-V', action='store_true', help='Enable verbose mode')
     parser.add_argument('--skip-fonts', '-F', action='store_true', help='Skip font installations')
     parser.add_argument('--force-root', '-f', action='store_true', help='Set LOGOS_FORCE_ROOT to true, which permits the root user to use the script.')
+    parser.add_argument('--reinstall-dependencies', '-I', action='store_true', help="Reinstall your distro's dependencies.")
     parser.add_argument('--regenerate-scripts', '-r', action='store_true', help='Regenerate the Logos.sh and controlPanel.sh scripts.')
     parser.add_argument('--debug', '-D', action='store_true', help='Enable Wine debug output.')
     parser.add_argument('--make-skel', '-k', action='store_true', help='Make a skeleton install only.')
@@ -1540,6 +1547,9 @@ def parse_command_line():
 
     if args.force_root:
         os.environ["LOGOS_FORCE_ROOT"] = "1"
+
+    if args.reinstall_dependencies:
+        os.environ["REINSTALL_DEPENDENCIES"] = "1"
 
     if args.regenerate_scripts:
         os.environ["REGENERATE"] = "1"
@@ -1571,13 +1581,13 @@ def install():
     LOGOS_LOG = os.environ.get('LOGOS_LOG')
     if verbose:
         print(datetime.datetime.now())
-    checkDependencies()  # We verify the user is running a graphical UI and has majority of required dependencies.
-    if verbose:
-        print(datetime.datetime.now())
     chooseProduct()  # We ask user for his Faithlife product's name and set variables.
     if verbose:
         print(datetime.datetime.now())
     chooseVersion()  # We ask user for his Faithlife product's version, set variables, and create project skeleton.
+    if verbose:
+        print(datetime.datetime.now())
+    logos_setup() # We set some basic variables for the install, including retrieving the product's latest release.
     if verbose:
         print(datetime.datetime.now())
     chooseInstallMethod()  # We ask user for his desired install method.
@@ -1812,7 +1822,7 @@ def main():
     options_exit = ["Exit"]
     if file_exists(CONFIG_FILE):
         get_config_env(CONFIG_FILE)
-        options_installed = [f"Run {FLPRODUCT}", "Run Indexing", "Remove Library Catalog", "Remove All Index Files", "Edit Config", "Back up Data", "Restore Data", "Set AppImage", "Control Panel", "Run Winetricks"]
+        options_installed = [f"Run {FLPRODUCT}", "Run Indexing", "Remove Library Catalog", "Remove All Index Files", "Edit Config", "Reinstall Dependencies", "Back up Data", "Restore Data", "Set AppImage", "Control Panel", "Run Winetricks"]
         if os.environ["LOGS"] == "DISABLED":
             options_installed.extend("Enable Logging")
         else:
@@ -1843,6 +1853,10 @@ def main():
         remove_all_index_files()
     elif "Edit Config" in choice:
         edit_config()
+    elif "Reinstall Dependencies":
+        os_name, os_release = get_os()
+        superuser_command, package_manager_command, packages = get_package_manager()
+        checkDependencies()
     elif "Back up Data" in choice:
         backup()
     elif "Restore Data" in choice:
