@@ -28,6 +28,7 @@ WINETRICKSBIN = os.getenv('WINETRICKSBIN')
 # Variables that can be set in the environment.
 CONFIG_FILE = os.getenv('CONFIG_FILE')
 CUSTOMBINPATH = os.getenv('CUSTOMBINPATH')
+DEBUG = os.getenv('DEBUG', False)
 DIALOG = os.getenv('DIALOG')
 LOGOS_LOG = os.getenv('LOGOS_LOG', os.path.expanduser("~/.local/state/Logos_on_Linux/install.log"))
 LOGOS_VERSION = os.getenv('LOGOS_VERSION')
